@@ -274,6 +274,9 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
 
     let syncedCount = 0
     let errorCount = 0
+    
+    // Track all projects that were synced for metadata extraction
+    const syncedProjects = new Map<string, { id: string; projectCode: string }>()
 
     // Build a map of rows for hierarchy lookup
     const rowMap: { [key: string]: any } = {}
@@ -347,6 +350,11 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
             }
           })
           console.log(`✅ Linked WBS sheet to project: ${wbsData.projectCode}`)
+        }
+        
+        // Track this project for metadata extraction after the loop
+        if (!syncedProjects.has(project.projectCode)) {
+          syncedProjects.set(project.projectCode, { id: project.id, projectCode: project.projectCode })
         }
 
         // Remove projectCode from wbsData since it's not a column in our database
@@ -427,18 +435,19 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
     //   Row 2: Project name (like "* Unit Zone Prediction ML Application *"), Owner in "Assigned To" column
     //   Row 3+: WBS items (phases, tasks, subtasks)
     
-    if (project) {
+    // Process metadata for all synced projects
+    for (const [projectCode, projectInfo] of syncedProjects) {
       try {
         // Get all synced items for this project
         const syncedItems = await prisma.wbsCache.findMany({
-          where: { projectId: project.id },
+          where: { projectId: projectInfo.id },
           orderBy: { orderIndex: 'asc' }
         })
 
         // Find Row 1 - the project code row (has P-XXXX pattern)
         const projectCodeRow = syncedItems.find(item => 
           item.name && 
-          (item.name.startsWith('P-') || item.name === project.projectCode)
+          (item.name.startsWith('P-') || item.name === projectCode)
         )
 
         // Find Row 2 - the project name row (skipWbs=true, not a P-code, should be second row)
@@ -446,7 +455,7 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
           item.skipWbs && 
           item.name && 
           !item.name.startsWith('P-') && 
-          item.name !== project.projectCode
+          item.name !== projectCode
         )
 
         // Build update data from the project rows
@@ -463,7 +472,7 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
         if (projectNameRow) {
           // Clean up the title (remove asterisks and extra spaces)
           const cleanTitle = projectNameRow.name.replace(/^\*+\s*|\s*\*+$/g, '').trim()
-          if (cleanTitle && cleanTitle !== project.title) {
+          if (cleanTitle) {
             projectUpdateData.title = cleanTitle
             console.log(`Extracted project title: ${cleanTitle}`)
           }
@@ -487,13 +496,13 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
         // Update project if we have any new metadata
         if (Object.keys(projectUpdateData).length > 0) {
           await prisma.project.update({
-            where: { id: project.id },
+            where: { id: projectInfo.id },
             data: projectUpdateData
           })
-          console.log(`✅ Updated project ${project.projectCode} with metadata:`, Object.keys(projectUpdateData))
+          console.log(`✅ Updated project ${projectCode} with metadata:`, Object.keys(projectUpdateData))
         }
       } catch (metadataError) {
-        console.error('Error extracting project metadata:', metadataError)
+        console.error(`Error extracting project metadata for ${projectCode}:`, metadataError)
         // Don't fail the sync if metadata extraction fails
       }
     }
