@@ -144,9 +144,10 @@ function SettingsContent() {
     try {
       // Mock loading user settings - in real app, fetch from API
       if (user) {
+        // AuthContext user does not include email; default to empty string
         setUserSettings(prev => ({
           ...prev,
-          email: user.email || '',
+          email: '', // email not tracked in simple auth
           name: user.name || ''
         }))
       }

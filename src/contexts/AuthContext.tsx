@@ -7,6 +7,7 @@ interface User {
   id: string
   name: string
   lastName: string
+  email?: string
   role: string  // Keep for backwards compatibility but not used for access control
   loginTime?: string
 }
