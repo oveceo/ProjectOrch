@@ -67,6 +67,71 @@ export async function POST(request: NextRequest) {
 
     const syncedTasks = await syncWbsHierarchy(sheet, projectId, project.projectCode)
 
+    // Extract project metadata from special rows
+    // Row 1: Project code (P-XXXX), Approver in "Assigned To" column
+    // Row 2: Project name (like "* Unit Zone Prediction ML Application *"), Owner in "Assigned To" column
+    try {
+      // Find Row 1 - the project code row (has P-XXXX pattern)
+      const projectCodeRow = syncedTasks.find((item: any) => 
+        item.name && 
+        (item.name.startsWith('P-') || item.name === project.projectCode)
+      )
+
+      // Find Row 2 - the project name row (skipWbs=true, not a P-code)
+      const projectNameRow = syncedTasks.find((item: any) => 
+        item.skipWbs && 
+        item.name && 
+        !item.name.startsWith('P-') && 
+        item.name !== project.projectCode
+      )
+
+      // Build update data from the project rows
+      const projectUpdateData: any = {}
+
+      // Get APPROVER from Row 1's "Assigned To" field
+      if (projectCodeRow?.ownerLastName) {
+        projectUpdateData.approverLastName = projectCodeRow.ownerLastName
+        console.log(`Extracted approver: ${projectCodeRow.ownerLastName}`)
+      }
+
+      // Get PROJECT OWNER from Row 2's "Assigned To" field
+      if (projectNameRow) {
+        // Clean up the title (remove asterisks and extra spaces)
+        const cleanTitle = projectNameRow.name.replace(/^\*+\s*|\s*\*+$/g, '').trim()
+        if (cleanTitle && cleanTitle !== project.title) {
+          projectUpdateData.title = cleanTitle
+          console.log(`Extracted project title: ${cleanTitle}`)
+        }
+
+        // The owner is in Row 2's "Assigned To"
+        if (projectNameRow.ownerLastName) {
+          projectUpdateData.ownerLastName = projectNameRow.ownerLastName
+          console.log(`Extracted project owner: ${projectNameRow.ownerLastName}`)
+        }
+
+        // Copy over financial and timeline data
+        if (projectNameRow.budget) projectUpdateData.budget = projectNameRow.budget
+        if (projectNameRow.actual) projectUpdateData.actual = projectNameRow.actual
+        if (projectNameRow.variance) projectUpdateData.variance = projectNameRow.variance
+        if (projectNameRow.startDate) projectUpdateData.startDate = projectNameRow.startDate
+        if (projectNameRow.endDate) projectUpdateData.endDate = projectNameRow.endDate
+        if (projectNameRow.status) projectUpdateData.status = projectNameRow.status
+        if (projectNameRow.description) projectUpdateData.description = projectNameRow.description
+      }
+
+      // Update project if we have any new metadata
+      if (Object.keys(projectUpdateData).length > 0) {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: projectUpdateData
+        })
+        console.log(`✅ Updated project ${project.projectCode} with metadata:`, Object.keys(projectUpdateData))
+      }
+    } catch (metadataError) {
+      console.error('Error extracting project metadata:', metadataError)
+      // Don't fail the sync if metadata extraction fails
+    }
+
     console.log(`✅ WBS sync completed: ${syncedTasks.length} tasks synced`)
 
     return NextResponse.json({
@@ -132,6 +197,7 @@ async function syncWbsHierarchy(sheet: any, projectId: string, projectCode: stri
           variance: taskData.variance || null,
           notes: taskData.notes || null,
           atRisk: taskData.atRisk || false,
+          skipWbs: taskData.skipWbs || false,
           orderIndex: i,
           parentId: null, // Will be set in second pass
           lastSyncedAt: new Date()
@@ -228,12 +294,17 @@ function extractWbsTaskData(row: any, columns: any[], projectId: string, orderIn
   // Get other fields
   taskData.notes = SmartsheetAPI.getCellValue(row, columns, 'Notes')
   taskData.atRisk = SmartsheetAPI.getCellValue(row, columns, 'At Risk') === true
+  
+  // Get skipWbs - critical for identifying header rows (project code, project name rows)
+  const skipWbsValue = SmartsheetAPI.getCellValue(row, columns, 'Skip WBS')
+  taskData.skipWbs = skipWbsValue === true || skipWbsValue === 'Yes' || skipWbsValue === 'true'
 
   return taskData
 }
 
 /**
- * Map Smartsheet status to our enum
+ * Map Smartsheet status to valid ProjectStatus enum values
+ * Valid values: Not_Started, In_Progress, Blocked, At_Risk, Complete
  */
 function mapSmartsheetStatus(status: string): string {
   if (!status) return 'Not_Started'
@@ -243,21 +314,24 @@ function mapSmartsheetStatus(status: string): string {
   switch (normalizedStatus) {
     case 'not started':
     case 'not_started':
+    case 'pending':
       return 'Not_Started'
     case 'in progress':
     case 'in_progress':
+    case 'approval pending':
+    case 'approval_pending':
       return 'In_Progress'
     case 'complete':
     case 'completed':
-      return 'Complete'
-    case 'approval pending':
-    case 'approval_pending':
-      return 'Approval_Pending'
     case 'approved':
-      return 'Approved'
+      return 'Complete'
+    case 'blocked':
     case 'on hold':
     case 'on_hold':
-      return 'On_Hold'
+      return 'Blocked'
+    case 'at risk':
+    case 'at_risk':
+      return 'At_Risk'
     default:
       return 'Not_Started'
   }

@@ -45,15 +45,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check user permissions
-    const isAdmin = ['Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette', 'Adams', 'Allen'].includes(userLastName)
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Access denied to create WBS tasks' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can create WBS tasks
+    console.log(`WBS task creation by: ${userLastName}`)
 
     // Get project details
     const project = await prisma.project.findUnique({

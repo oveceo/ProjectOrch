@@ -67,6 +67,7 @@ interface SmartsheetProjectRow {
 // Interface for Smartsheet WBS data
 interface SmartsheetWbsRow {
   id: number
+  parentId?: number  // For hierarchy support
   cells: {
     columnId: number
     value?: string
@@ -102,6 +103,7 @@ const WBS_COLUMN_MAPPING = {
   variance: 'Variance',
   notes: 'Notes',
   atRisk: 'At Risk',
+  skipWbs: 'Skip WBS', // Skip WBS checkbox - marks header rows
   orderIndex: 'Row ID', // Using "Row ID" from your actual columns
   projectCode: 'Project Code' // Will be extracted from row hierarchy or separate column
 }
@@ -279,7 +281,8 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
       rowMap[row.id] = row
     })
 
-    for (const row of sheetData.rows) {
+    for (let rowIndex = 0; rowIndex < sheetData.rows.length; rowIndex++) {
+      const row = sheetData.rows[rowIndex]
       try {
         // Extract WBS data from Smartsheet row
         const wbsData = extractWbsDataFromRow(row, sheetData.columns)
@@ -392,8 +395,8 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
           const status = (wbsData.status as any) || 'Not_Started'
           const atRisk = wbsData.atRisk ?? false
           const skipWbs = wbsData.skipWbs ?? false
-          // Smartsheet rows don't include rowNumber in our type; use 0 as default order
-          const orderIndex = 0
+          // Use row index for proper ordering
+          const orderIndex = rowIndex
           const parentRowId = row.parentId ? row.parentId.toString() : null
 
           await prisma.wbsCache.create({
@@ -415,6 +418,83 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
       } catch (error) {
         console.error(`Error syncing WBS row ${row.id}:`, error)
         errorCount++
+      }
+    }
+
+    // After syncing all WBS items, extract project metadata from special rows
+    // Row structure in Smartsheet:
+    //   Row 1: Project code (P-XXXX), Approver in "Assigned To" column
+    //   Row 2: Project name (like "* Unit Zone Prediction ML Application *"), Owner in "Assigned To" column
+    //   Row 3+: WBS items (phases, tasks, subtasks)
+    
+    if (project) {
+      try {
+        // Get all synced items for this project
+        const syncedItems = await prisma.wbsCache.findMany({
+          where: { projectId: project.id },
+          orderBy: { orderIndex: 'asc' }
+        })
+
+        // Find Row 1 - the project code row (has P-XXXX pattern)
+        const projectCodeRow = syncedItems.find(item => 
+          item.name && 
+          (item.name.startsWith('P-') || item.name === project.projectCode)
+        )
+
+        // Find Row 2 - the project name row (skipWbs=true, not a P-code, should be second row)
+        const projectNameRow = syncedItems.find(item => 
+          item.skipWbs && 
+          item.name && 
+          !item.name.startsWith('P-') && 
+          item.name !== project.projectCode
+        )
+
+        // Build update data from the project rows
+        const projectUpdateData: any = {}
+
+        // Get APPROVER from Row 1's "Assigned To" field
+        // The format is "Approver, Keith Clark" - stored in ownerLastName after extraction
+        if (projectCodeRow?.ownerLastName) {
+          projectUpdateData.approverLastName = projectCodeRow.ownerLastName
+          console.log(`Extracted approver: ${projectCodeRow.ownerLastName} from project code row`)
+        }
+
+        // Get PROJECT OWNER from Row 2's "Assigned To" field
+        if (projectNameRow) {
+          // Clean up the title (remove asterisks and extra spaces)
+          const cleanTitle = projectNameRow.name.replace(/^\*+\s*|\s*\*+$/g, '').trim()
+          if (cleanTitle && cleanTitle !== project.title) {
+            projectUpdateData.title = cleanTitle
+            console.log(`Extracted project title: ${cleanTitle}`)
+          }
+
+          // The owner is in Row 2's "Assigned To"
+          if (projectNameRow.ownerLastName) {
+            projectUpdateData.ownerLastName = projectNameRow.ownerLastName
+            console.log(`Extracted project owner: ${projectNameRow.ownerLastName}`)
+          }
+
+          // Copy over financial and timeline data from the project name row
+          if (projectNameRow.budget) projectUpdateData.budget = projectNameRow.budget
+          if (projectNameRow.actual) projectUpdateData.actual = projectNameRow.actual
+          if (projectNameRow.variance) projectUpdateData.variance = projectNameRow.variance
+          if (projectNameRow.startDate) projectUpdateData.startDate = projectNameRow.startDate
+          if (projectNameRow.endDate) projectUpdateData.endDate = projectNameRow.endDate
+          if (projectNameRow.status) projectUpdateData.status = projectNameRow.status
+          if (projectNameRow.description) projectUpdateData.description = projectNameRow.description
+        }
+
+        // Update project if we have any new metadata
+        if (Object.keys(projectUpdateData).length > 0) {
+          await prisma.project.update({
+            where: { id: project.id },
+            data: projectUpdateData
+          })
+          console.log(`✅ Updated project ${project.projectCode} with metadata:`, Object.keys(projectUpdateData))
+        }
+      } catch (metadataError) {
+        console.error('Error extracting project metadata:', metadataError)
+        // Don't fail the sync if metadata extraction fails
       }
     }
 
@@ -546,6 +626,9 @@ function extractWbsDataFromRow(row: SmartsheetWbsRow, columns: any[]): Partial<a
     }
     if (columnTitle === WBS_COLUMN_MAPPING.atRisk) {
       wbsData.atRisk = cell.value === 'true' || cell.displayValue?.toLowerCase() === 'yes'
+    }
+    if (columnTitle === WBS_COLUMN_MAPPING.skipWbs) {
+      wbsData.skipWbs = cell.value === true || cell.value === 'true' || cell.displayValue?.toLowerCase() === 'yes'
     }
     if (columnTitle === WBS_COLUMN_MAPPING.projectCode) {
       wbsData.projectCode = cell.value || cell.displayValue

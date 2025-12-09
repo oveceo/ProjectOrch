@@ -57,6 +57,9 @@ export interface ProjectWithRelations {
   startDate?: Date | null
   endDate?: Date | null
   atRisk?: boolean | null
+  ownerLastName?: string | null       // Project owner (from Smartsheet Row 2)
+  approverLastName?: string | null    // Project approver (from Smartsheet Row 1)
+  creatorLastName?: string | null     // Creator's last name
   lastUpdateAt?: Date | null
   createdAt: Date
   updatedAt: Date

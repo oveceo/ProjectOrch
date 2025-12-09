@@ -32,15 +32,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check user permissions
-    const isAdmin = ['Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette', 'Adams', 'Allen'].includes(userLastName)
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Access denied to view WBS tasks' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can view WBS tasks
+    console.log(`WBS tasks requested by: ${userLastName}`)
 
     // Fetch WBS tasks for the project
     const wbsTasks = await prisma.wbsCache.findMany({
@@ -131,15 +124,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check user permissions (similar to existing WBS API)
-    const isAdmin = ['Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette', 'Adams', 'Allen'].includes(userLastName)
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Access denied to create WBS tasks' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can create WBS tasks
+    console.log(`WBS task creation requested by: ${userLastName}`)
 
     // Get the next order index for this project
     const lastTask = await prisma.wbsCache.findFirst({
