@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         apiLogger.info('WBS folder created successfully', { projectCode })
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-        apiLogger.error('Failed to create WBS folder', { projectCode, error: errorMsg })
+        apiLogger.error(`Failed to create WBS folder for ${projectCode}: ${errorMsg}`)
         results.errors.push(`${projectCode}: ${errorMsg}`)
       }
     }
