@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
       },
       orderBy: [
         { orderIndex: 'asc' },
-        { createdAt: 'asc' }
+        // createdAt is not present in the WbsCache model; order by id to keep deterministic ordering
+        { id: 'asc' }
       ]
     })
 
