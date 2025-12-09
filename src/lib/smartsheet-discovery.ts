@@ -52,7 +52,7 @@ export async function discoverWbsSheets(workspaceId: string): Promise<WorkspaceS
     })
 
     // The Smartsheet SDK might wrap the response
-    const workspace = response.data || response
+    const workspace = (response.data || response) as SmartsheetWorkspace
 
     console.log('Response type:', typeof response)
     console.log('Response keys:', Object.keys(response))
@@ -63,9 +63,9 @@ export async function discoverWbsSheets(workspaceId: string): Promise<WorkspaceS
     console.log(`Workspace has ${workspace.sheets?.length || 0} direct sheets`)
     console.log(`Workspace has ${workspace.folders?.length || 0} folders`)
     
-    if (workspace.folders) {
+    if (workspace.folders && workspace.folders.length > 0) {
       console.log('Folders found:')
-      (workspace.folders as WorkspaceFolder[]).forEach((folder: WorkspaceFolder) => {
+      workspace.folders.forEach((folder: WorkspaceFolder) => {
         console.log(`  - "${folder.name}" (ID: ${folder.id})`)
       })
     }
