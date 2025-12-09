@@ -168,9 +168,22 @@ export async function syncProjectsFromSmartsheet(sheetId: string) {
           })
         } else {
           // Create new project
+          const projectCode = projectData.projectCode || `P-${row.id}`
+          const projectTitle = projectData.title || projectCode
+
           await prisma.project.create({
             data: {
-              ...projectData,
+              projectCode,
+              title: projectTitle,
+              description: projectData.description || null,
+              category: projectData.category || null,
+              approverEmail: projectData.approverEmail || null,
+              assigneeEmail: projectData.assigneeEmail || null,
+              approvalStatus: projectData.approvalStatus || 'Pending_Approval',
+              status: projectData.status || 'Not_Started',
+              budget: projectData.budget ? String(projectData.budget) : null,
+              startDate: projectData.startDate || null,
+              endDate: projectData.endDate || null,
               portfolioRowId: row.id.toString(),
               createdById: null // Will be set when a user claims it
             }
