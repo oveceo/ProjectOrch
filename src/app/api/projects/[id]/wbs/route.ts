@@ -595,6 +595,10 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
       return col?.id
     }
 
+    // Note: Some columns are FORMULAS in Smartsheet and cannot be edited:
+    // - Variance (typically = Budget - Actual)
+    // - WBS (typically auto-calculated from hierarchy)
+    // - Skip WBS (may be locked)
     const columnMap = {
       name: getColumnId('Name') || getColumnId('Task Name'),
       description: getColumnId('Description'),
@@ -606,10 +610,8 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
       atRisk: getColumnId('At Risk'),
       budget: getColumnId('Budget'),
       actual: getColumnId('Actual'),
-      variance: getColumnId('Variance'),
-      notes: getColumnId('Notes'),
-      skipWbs: getColumnId('Skip WBS'),
-      wbs: getColumnId('WBS')
+      notes: getColumnId('Notes')
+      // Excluded formula columns: variance, wbs, skipWbs
     }
 
     apiLogger.debug('Column mapping', { columnMap })
@@ -673,19 +675,16 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
         const actualNum = parseCurrency(item.actual)
         cells.push({ columnId: columnMap.actual, value: actualNum ?? '' })
       }
-      if (columnMap.variance) {
-        const varianceNum = parseCurrency(item.variance)
-        cells.push({ columnId: columnMap.variance, value: varianceNum ?? '' })
-      }
+      // NOTE: Variance is a FORMULA column in Smartsheet (Budget - Actual) - DO NOT update it
+      // Smartsheet will calculate it automatically when Budget or Actual changes
+      
       if (columnMap.notes) {
         cells.push({ columnId: columnMap.notes, value: item.notes || '' })
       }
       if (columnMap.atRisk) {
         cells.push({ columnId: columnMap.atRisk, value: item.atRisk || false })
       }
-      if (columnMap.skipWbs) {
-        cells.push({ columnId: columnMap.skipWbs, value: item.skipWbs || false })
-      }
+      // NOTE: Formula columns (Variance, WBS, Skip WBS) are not included in updates
 
       return cells
     }
