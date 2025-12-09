@@ -107,10 +107,10 @@ export class SmartsheetAPI {
     )
   }
 
-  // Update rows in sheet (SDK uses updateRow for both single and multiple)
+  // Update rows in sheet
   static async updateRows(sheetId: number, rows: any[]): Promise<any> {
     return withRetry(
-      () => client.sheets.updateRow({
+      () => client.sheets.updateRows({
         sheetId,
         body: rows
       }),
