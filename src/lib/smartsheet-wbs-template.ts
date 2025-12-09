@@ -15,7 +15,12 @@ export async function createWbsSheetFromTemplate(
   projectTitle: string, 
   targetFolderId: number,
   templateSheetId?: number
-) {
+): Promise<{
+  success: boolean
+  sheetId?: any
+  sheetName?: string
+  error?: string
+}> {
   try {
     if (!process.env.SMARTSHEET_ACCESS_TOKEN) {
       throw new Error('Smartsheet access token not configured')
