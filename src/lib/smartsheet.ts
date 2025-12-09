@@ -124,7 +124,7 @@ export class SmartsheetAPI {
     return withRetry(
       () => client.sheets.deleteRows({
         sheetId,
-        queryParameters: { ids: rowIds }
+        ids: rowIds
       }),
       'deleteRows',
       { sheetId, rowIds }
