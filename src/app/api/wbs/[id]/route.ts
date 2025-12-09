@@ -189,12 +189,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Update the task
+    // Update the task - destructure status to handle separately
+    const { status: rawStatus, ...restUpdateData } = updateData
     const updatedTask = await prisma.wbsCache.update({
       where: { id },
       data: {
-        ...updateData,
-        ...(updateData.status ? { status: statusToProjectStatus(updateData.status) } : {}),
+        ...restUpdateData,
+        ...(rawStatus ? { status: statusToProjectStatus(rawStatus) } : {}),
         lastSyncedAt: new Date(), // Mark as needing sync
       },
       include: {
