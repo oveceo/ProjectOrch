@@ -81,6 +81,28 @@ function generateTempId(): string {
   return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
+// Format currency value for display
+function formatCurrency(value: string | null | undefined): string {
+  if (!value) return ''
+  const num = parseFloat(String(value).replace(/[^0-9.-]+/g, ''))
+  if (isNaN(num)) return value
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(num)
+}
+
+// Parse currency string back to number for saving
+function parseCurrencyValue(value: string): string | null {
+  if (!value) return null
+  const cleaned = value.replace(/[^0-9.-]+/g, '')
+  if (!cleaned || cleaned === '') return null
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? null : String(num)
+}
+
 // Build hierarchical tree from flat data using parentRowId (Smartsheet) or parentId (local)
 function buildHierarchy(flatItems: any[]): WbsItem[] {
   const itemMap = new Map<string, WbsItem>()
@@ -168,12 +190,15 @@ function buildHierarchy(flatItems: any[]): WbsItem[] {
   return rootItems
 }
 
-// Flatten tree for saving to database
-function flattenTree(items: WbsItem[], parentId: string | null = null, parentSmartsheetRowId: string | null = null): any[] {
+// Flatten tree for saving to database - uses global counter for proper ordering
+function flattenTree(items: WbsItem[], parentId: string | null = null, parentSmartsheetRowId: string | null = null, counter: { value: number } = { value: 0 }): any[] {
   const result: any[] = []
-  items.forEach((item, index) => {
+  items.forEach((item) => {
     // For new items (with tempId), send the tempId so API can map parent references
     const isNewItem = !!item.tempId && !item.id?.startsWith('c') // cuid starts with 'c'
+    
+    // Use global counter for orderIndex to maintain proper order across all levels
+    const orderIndex = counter.value++
     
     result.push({
       id: isNewItem ? undefined : item.id,
@@ -195,14 +220,15 @@ function flattenTree(items: WbsItem[], parentId: string | null = null, parentSma
       variance: item.variance,
       notes: item.notes,
       skipWbs: item.skipWbs,
-      orderIndex: index
+      orderIndex: orderIndex
     })
     if (item.children.length > 0) {
-      // Pass both the local ID and Smartsheet row ID for the parent
+      // Pass both the local ID and Smartsheet row ID for the parent, and the counter
       result.push(...flattenTree(
         item.children, 
         item.tempId || item.id,
-        item.smartsheetRowId || null
+        item.smartsheetRowId || null,
+        counter
       ))
     }
   })
@@ -713,25 +739,25 @@ function WbsEditorContent() {
           />
         </td>
 
-        {/* Budget */}
-        <td className="w-20 px-2 py-2">
+        {/* Budget - Display formatted, store raw */}
+        <td className="w-24 px-2 py-2">
           <input
             type="text"
-            value={item.budget || ''}
-            onChange={(e) => updateItem(item.id || item.tempId!, 'budget', e.target.value || null)}
-            placeholder="$0.00"
-            className="w-full px-1 py-1 text-sm border-0 bg-transparent focus:ring-1 focus:ring-blue-500 rounded text-right"
+            value={formatCurrency(item.budget)}
+            onChange={(e) => updateItem(item.id || item.tempId!, 'budget', parseCurrencyValue(e.target.value))}
+            placeholder="$0"
+            className="w-full px-1 py-1 text-sm border-0 bg-transparent focus:ring-1 focus:ring-blue-500 rounded text-right font-medium text-green-700"
           />
         </td>
 
-        {/* Actual */}
-        <td className="w-20 px-2 py-2">
+        {/* Actual - Display formatted, store raw */}
+        <td className="w-24 px-2 py-2">
           <input
             type="text"
-            value={item.actual || ''}
-            onChange={(e) => updateItem(item.id || item.tempId!, 'actual', e.target.value || null)}
-            placeholder="$0.00"
-            className="w-full px-1 py-1 text-sm border-0 bg-transparent focus:ring-1 focus:ring-blue-500 rounded text-right"
+            value={formatCurrency(item.actual)}
+            onChange={(e) => updateItem(item.id || item.tempId!, 'actual', parseCurrencyValue(e.target.value))}
+            placeholder="$0"
+            className="w-full px-1 py-1 text-sm border-0 bg-transparent focus:ring-1 focus:ring-blue-500 rounded text-right font-medium text-blue-700"
           />
         </td>
 
@@ -865,8 +891,8 @@ function WbsEditorContent() {
                   <th className="w-28 px-2 py-3 text-left">Start Date</th>
                   <th className="w-28 px-2 py-3 text-left">End Date</th>
                   <th className="w-12 px-2 py-3 text-center">At Risk</th>
-                  <th className="w-20 px-2 py-3 text-right">Budget</th>
-                  <th className="w-20 px-2 py-3 text-right">Actual</th>
+                  <th className="w-24 px-2 py-3 text-right">Budget</th>
+                  <th className="w-24 px-2 py-3 text-right">Actual</th>
                   <th className="w-20 px-2 py-3 text-center">Actions</th>
                 </tr>
               </thead>
