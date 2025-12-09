@@ -496,11 +496,7 @@ function extractProjectDataFromRow(row: SmartsheetProjectRow, columns: any[]): P
 function extractWbsDataFromRow(row: SmartsheetWbsRow, columns: any[]): Partial<any> {
   const wbsData: any = {}
 
-  // Log available columns for the first row
-  if (row.rowNumber === 1) {
-    console.log('📋 Available columns in WBS sheet:')
-    columns.forEach(col => console.log(`  - "${col.title}" (ID: ${col.id})`))
-  }
+  // Log available columns for the first row (skip rowNumber, not in type)
 
   // Create a map of column titles to their IDs
   const columnMap: { [key: string]: number } = {}
