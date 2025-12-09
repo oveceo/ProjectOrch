@@ -1,0 +1,183 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  assignee
+  creator
+  manager
+  eo_engineer
+  approver
+}
+
+enum ApprovalStatus {
+  Pending_Approval
+  Approved
+  Rejected
+}
+
+enum ProjectStatus {
+  Not_Started
+  In_Progress
+  Blocked
+  At_Risk
+  Complete
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(assignee)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdProjects     Project[] @relation("ProjectCreator")
+  assignedProjects    Project[] @relation("ProjectAssignee")
+  approvedProjects    Project[] @relation("ProjectApprover")
+  wbsAssignedTasks    WbsCache[] @relation("WbsAssignee")
+  auditEntries        Audit[]
+  accounts            Account[]
+  sessions            Session[]
+
+  @@map("users")
+}
+
+model Project {
+  id                String         @id @default(cuid())
+  portfolioRowId    String?        @unique // Smartsheet row ID
+  projectCode       String         @unique // ### column value (e.g., P-0015)
+  title             String         // Project Name
+  description       String?
+  category          String?
+  approverEmail     String?
+  assigneeEmail     String?
+  approvalStatus    ApprovalStatus @default(Pending_Approval)
+  status            ProjectStatus  @default(Not_Started)
+  wbsSheetId        String?        // Smartsheet sheet ID for WBS
+  wbsSheetUrl       String?        // URL to WBS sheet
+  wbsAppUrl         String?        // In-app WBS URL
+  requiresWbs       Boolean        @default(false) // Work Breakdown Needed?
+  
+  // Financial & Timeline fields
+  budget            String?        // Project budget
+  actual            String?        // Actual spend
+  variance          String?        // Budget variance
+  startDate         DateTime?      // Project start date
+  endDate           DateTime?      // Project end date
+  ownerLastName     String?        // Project owner/assigned to (from Smartsheet)
+  approverLastName  String?        // Approver's last name (from Smartsheet)
+  creatorLastName   String?        // Creator's last name (from Smartsheet)
+  
+  lastUpdateAt      DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  creator           User?          @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdById       String?
+  assignee          User?          @relation("ProjectAssignee", fields: [assignedById], references: [id])
+  assignedById      String?
+  approver          User?          @relation("ProjectApprover", fields: [approvedById], references: [id])
+  approvedById      String?
+  wbsCache          WbsCache[]
+
+  @@map("projects")
+}
+
+model WbsCache {
+  id            String      @id @default(cuid())
+  projectId     String
+  smartsheetRowId String?   @unique // Smartsheet row ID
+  parentRowId   String?     // For hierarchy
+  name          String      // Name column
+  description   String?
+  ownerLastName    String?     // Assigned To (last name)
+  approverLastName String?     // Approver (last name)
+  status        ProjectStatus @default(Not_Started)
+  startDate     DateTime?
+  endDate       DateTime?
+  atRisk        Boolean     @default(false)
+  budget        String?
+  actual        String?
+  variance      String?
+  notes         String?
+  skipWbs       Boolean     @default(false) // Skip WBS checkbox
+  orderIndex    Int         @default(0) // For ordering
+  lastSyncedAt  DateTime    @default(now())
+
+  // Relations
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee      User?       @relation("WbsAssignee", fields: [assignedById], references: [id])
+  assignedById  String?
+  children      WbsCache[]  @relation("WbsHierarchy")
+  parent        WbsCache?   @relation("WbsHierarchy", fields: [parentId], references: [id])
+  parentId      String?
+
+  @@map("wbs_cache")
+}
+
+model Audit {
+  id          String   @id @default(cuid())
+  actorEmail  String
+  action      String   // e.g., "CREATE_PROJECT", "UPDATE_WBS", "APPROVE_PROJECT"
+  targetType  String   // "Project", "WbsCache", "User"
+  targetId    String
+  payload     Json?    // Additional data about the change
+  createdAt   DateTime @default(now())
+
+  // Relations
+  actor       User?    @relation(fields: [actorId], references: [id])
+  actorId     String?
+
+  @@map("audit")
+}
+
+// NextAuth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}

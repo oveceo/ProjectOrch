@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Ohio Valley Electric Corporate Colors */
+    --background: 0 0% 100%;
+    --foreground: 220 13% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%;
+
+    /* Corporate Blue - Primary */
+    --primary: 207 100% 30%; /* Electric blue */
+    --primary-foreground: 0 0% 98%;
+
+    /* Professional Grays */
+    --secondary: 220 13% 96%;
+    --secondary-foreground: 220 13% 18%;
+
+    --muted: 220 13% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 207 100% 96%;
+    --accent-foreground: 207 100% 20%;
+
+    /* Status Colors - Electrical themed */
+    --success: 142 76% 36%; /* Electrical green */
+    --warning: 38 92% 50%; /* High voltage orange */
+    --error: 0 84% 60%; /* Alert red */
+    --info: 207 100% 30%; /* Electric blue */
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 207 100% 30%;
+
+    --radius: 0.5rem;
+
+    /* Custom Utility Colors */
+    --electric-blue: 207 100% 30%;
+    --electric-green: 142 76% 36%;
+    --high-voltage: 38 92% 50%;
+    --safety-orange: 25 95% 53%;
+    --corporate-gray: 220 9% 46%;
+    --corporate-light: 220 13% 96%;
+  }
+
+  .dark {
+    --background: 220 13% 6%;
+    --foreground: 0 0% 98%;
+    --card: 220 13% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 13% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 207 100% 40%;
+    --primary-foreground: 220 13% 9%;
+    --secondary: 220 13% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 220 13% 15%;
+    --muted-foreground: 220 9% 56%;
+    --accent: 220 13% 15%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 15%;
+    --input: 220 13% 15%;
+    --ring: 207 100% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar for electrical theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Electrical themed gradients */
+  .electric-gradient {
+    background: linear-gradient(135deg,
+      hsl(var(--electric-blue)) 0%,
+      hsl(var(--electric-green)) 100%);
+  }
+
+  .status-not-started {
+    @apply bg-slate-100 text-slate-800 border-slate-200;
+  }
+  .status-in-progress {
+    @apply bg-blue-100 text-blue-800 border-blue-200;
+  }
+  .status-blocked {
+    @apply bg-red-100 text-red-800 border-red-200;
+  }
+  .status-at-risk {
+    @apply bg-orange-100 text-orange-800 border-orange-200;
+  }
+  .status-complete {
+    @apply bg-green-100 text-green-800 border-green-200;
+  }
+
+  .approval-pending {
+    @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  }
+  .approval-approved {
+    @apply bg-green-100 text-green-800 border-green-200;
+  }
+  .approval-rejected {
+    @apply bg-red-100 text-red-800 border-red-200;
+  }
+
+  /* Professional card styling */
+  .corporate-card {
+    @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  /* Electrical themed buttons */
+  .btn-electric {
+    @apply bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium px-4 py-2 rounded-md shadow-sm hover:shadow-md transition-all duration-200;
+  }
+
+  .btn-electric-outline {
+    @apply border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-medium px-4 py-2 rounded-md transition-all duration-200;
+  }
+}
+
+@layer utilities {
+  /* Electrical safety colors */
+  .text-electric-blue { color: hsl(var(--electric-blue)); }
+  .bg-electric-blue { background-color: hsl(var(--electric-blue)); }
+  .text-electric-green { color: hsl(var(--electric-green)); }
+  .bg-electric-green { background-color: hsl(var(--electric-green)); }
+  .text-high-voltage { color: hsl(var(--high-voltage)); }
+  .bg-high-voltage { background-color: hsl(var(--high-voltage)); }
+  .text-safety-orange { color: hsl(var(--safety-orange)); }
+  .bg-safety-orange { background-color: hsl(var(--safety-orange)); }
+}

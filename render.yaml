@@ -1,0 +1,44 @@
+# Render Blueprint for Transmission WBS Task Manager
+# This file defines all the resources needed for deployment
+
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: transmission-wbs-db
+    env: docker
+    plan: free
+    region: ohio
+    databaseName: eo_orchestrator
+    databaseUser: eo_app
+
+  # Web Service (Next.js App)
+  - type: web
+    name: transmission-wbs-app
+    env: node
+    plan: free
+    region: ohio
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: transmission-wbs-db
+          property: connectionString
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://transmission-wbs-app.onrender.com
+      - key: APP_BASE_URL
+        value: https://transmission-wbs-app.onrender.com
+      - key: AUTH_LOCAL_DEMO
+        value: "1"
+      # You'll need to add these manually in Render dashboard:
+      # - SMARTSHEET_ACCESS_TOKEN
+      # - SMARTSHEET_PORTFOLIO_SHEET_ID
+      # - SMARTSHEET_WBS_TEMPLATE_SHEET_ID
+      # - SMARTSHEET_WBS_FOLDER_ID
+    autoDeploy: true
+
