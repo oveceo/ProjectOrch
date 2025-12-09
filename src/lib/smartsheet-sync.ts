@@ -392,7 +392,8 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
           const status = (wbsData.status as any) || 'Not_Started'
           const atRisk = wbsData.atRisk ?? false
           const skipWbs = wbsData.skipWbs ?? false
-          const orderIndex = typeof row.rowNumber === 'number' ? row.rowNumber : 0
+          // Smartsheet rows don't include rowNumber in our type; use 0 as default order
+          const orderIndex = 0
           const parentRowId = row.parentId ? row.parentId.toString() : null
 
           await prisma.wbsCache.create({
