@@ -6,7 +6,11 @@ export { UserRole, ApprovalStatus, ProjectStatus }
 // Smartsheet types
 export interface SmartsheetRow {
   id: number
+  parentId?: number
   cells: SmartsheetCell[]
+  expanded?: boolean
+  createdAt?: string
+  modifiedAt?: string
 }
 
 export interface SmartsheetCell {
