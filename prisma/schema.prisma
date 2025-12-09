@@ -63,6 +63,7 @@ model Project {
   assigneeEmail     String?
   approvalStatus    ApprovalStatus @default(Pending_Approval)
   status            ProjectStatus  @default(Not_Started)
+  wbsFolderId       String?        // Smartsheet folder ID where WBS sheet lives
   wbsSheetId        String?        // Smartsheet sheet ID for WBS
   wbsSheetUrl       String?        // URL to WBS sheet
   wbsAppUrl         String?        // In-app WBS URL

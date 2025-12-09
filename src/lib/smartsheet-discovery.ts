@@ -65,7 +65,7 @@ export async function discoverWbsSheets(workspaceId: string): Promise<WorkspaceS
     
     if (workspace.folders) {
       console.log('Folders found:')
-      workspace.folders.forEach(folder => {
+      (workspace.folders as WorkspaceFolder[]).forEach((folder: WorkspaceFolder) => {
         console.log(`  - "${folder.name}" (ID: ${folder.id})`)
       })
     }

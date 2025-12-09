@@ -46,6 +46,7 @@ export interface ProjectWithRelations {
   assigneeEmail?: string | null
   approvalStatus: ApprovalStatus
   status: ProjectStatus
+  wbsFolderId?: string | null
   wbsSheetId?: string | null
   wbsSheetUrl?: string | null
   wbsAppUrl?: string | null
