@@ -388,9 +388,22 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
           })
         } else {
           // Create new WBS task
+          const name = wbsData.name || `Task ${row.id}`
+          const status = (wbsData.status as any) || 'Not_Started'
+          const atRisk = wbsData.atRisk ?? false
+          const skipWbs = wbsData.skipWbs ?? false
+          const orderIndex = typeof row.rowNumber === 'number' ? row.rowNumber : 0
+          const parentRowId = row.parentId ? row.parentId.toString() : null
+
           await prisma.wbsCache.create({
             data: {
               ...wbsData,
+              name,
+              status,
+              atRisk,
+              skipWbs,
+              orderIndex,
+              parentRowId,
               projectId: project.id,
               smartsheetRowId: row.id.toString()
             }
