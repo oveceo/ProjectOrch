@@ -18,6 +18,24 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { ProjectWithRelations, ApiResponse } from '@/types'
 import { ProjectStatus, ApprovalStatus } from '@prisma/client'
 
+// Shape of project update payload (matches /api/projects/[id] schema)
+interface CreateProjectForm {
+  title?: string
+  description?: string
+  category?: string
+  approverEmail?: string
+  assigneeEmail?: string
+  approvalStatus?: ApprovalStatus
+  status?: ProjectStatus
+  requiresWbs?: boolean
+  budget?: string
+  actual?: string
+  variance?: string
+  startDate?: string
+  endDate?: string
+  atRisk?: boolean
+}
+
 
 function ProjectsContent() {
   const { user, isLoading } = useAuth()
