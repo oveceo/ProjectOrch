@@ -436,7 +436,8 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
     //   Row 3+: WBS items (phases, tasks, subtasks)
     
     // Process metadata for all synced projects
-    for (const [projectCode, projectInfo] of syncedProjects) {
+    const projectEntries = Array.from(syncedProjects.entries())
+    for (const [projectCode, projectInfo] of projectEntries) {
       try {
         // Get all synced items for this project
         const syncedItems = await prisma.wbsCache.findMany({
