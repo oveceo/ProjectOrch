@@ -32,8 +32,8 @@ declare module 'smartsheet' {
     sheets: {
       getSheet: (options: { id: number }) => Promise<SmartsheetSheet>
       addRows: (options: { sheetId: number; body: any[] }) => Promise<any>
-      updateRows: (options: { sheetId: number; body: any[] }) => Promise<any>
-      deleteRows: (options: { sheetId: number; ids: number[] }) => Promise<any>
+      updateRow: (options: { sheetId: number; body: any[] }) => Promise<any>
+      deleteRow: (options: { sheetId: number; rowId: number }) => Promise<any>
       createSheet: (options: any) => Promise<any>
       copySheet: (options: any) => Promise<any>
     }

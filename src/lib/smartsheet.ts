@@ -107,10 +107,10 @@ export class SmartsheetAPI {
     )
   }
 
-  // Update rows in sheet
+  // Update rows in sheet (uses updateRow which accepts array of rows)
   static async updateRows(sheetId: number, rows: any[]): Promise<any> {
     return withRetry(
-      () => client.sheets.updateRows({
+      () => client.sheets.updateRow({
         sheetId,
         body: rows
       }),
@@ -119,16 +119,22 @@ export class SmartsheetAPI {
     )
   }
 
-  // Delete rows from sheet
+  // Delete rows from sheet (delete one at a time)
   static async deleteRows(sheetId: number, rowIds: number[]): Promise<any> {
-    return withRetry(
-      () => client.sheets.deleteRows({
-        sheetId,
-        ids: rowIds
-      }),
-      'deleteRows',
-      { sheetId, rowIds }
-    )
+    // Delete rows one by one since SDK uses deleteRow (singular)
+    const results = []
+    for (const rowId of rowIds) {
+      const result = await withRetry(
+        () => client.sheets.deleteRow({
+          sheetId,
+          rowId
+        }),
+        'deleteRow',
+        { sheetId, rowId }
+      )
+      results.push(result)
+    }
+    return results
   }
 
   // Create new sheet
