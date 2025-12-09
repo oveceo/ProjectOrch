@@ -98,8 +98,7 @@ export async function POST(request: NextRequest) {
         endDate: endDate ? new Date(endDate) : null,
         budget: budget || null,
         orderIndex: nextOrderIndex,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        lastSyncedAt: new Date()
       },
       include: {
         project: {
