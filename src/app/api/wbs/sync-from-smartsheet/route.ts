@@ -141,8 +141,6 @@ async function syncWbsHierarchy(sheet: any, projectId: string, projectCode: stri
           atRisk: taskData.atRisk || false,
           orderIndex: i,
           parentId: null, // Will be set in second pass
-          createdAt: new Date(),
-          updatedAt: new Date(),
           lastSyncedAt: new Date()
         }
       })
