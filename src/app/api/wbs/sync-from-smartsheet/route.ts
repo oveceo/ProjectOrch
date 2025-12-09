@@ -32,15 +32,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check user permissions
-    const isAdmin = ['Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette', 'Adams', 'Allen'].includes(userLastName)
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Access denied to sync WBS data' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can sync WBS data
+    console.log(`WBS sync requested by: ${userLastName}`)
 
     // Verify project exists
     const project = await prisma.project.findUnique({

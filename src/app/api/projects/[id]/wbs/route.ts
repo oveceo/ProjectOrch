@@ -599,12 +599,14 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
       name: getColumnId('Name') || getColumnId('Task Name'),
       description: getColumnId('Description'),
       assignedTo: getColumnId('Assigned To'),
+      approver: getColumnId('Approver'),
       status: getColumnId('Status'),
       startDate: getColumnId('Start Date'),
       endDate: getColumnId('End Date'),
       atRisk: getColumnId('At Risk'),
       budget: getColumnId('Budget'),
       actual: getColumnId('Actual'),
+      variance: getColumnId('Variance'),
       notes: getColumnId('Notes'),
       skipWbs: getColumnId('Skip WBS'),
       wbs: getColumnId('WBS')
@@ -632,6 +634,13 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
         const contactObj = buildContactObject(item.ownerLastName, contactMap)
         if (contactObj) {
           cells.push({ columnId: columnMap.assignedTo, objectValue: contactObj })
+        }
+      }
+      if (columnMap.approver && item.approverLastName) {
+        // Approver is also a CONTACT column
+        const approverContactObj = buildContactObject(item.approverLastName, contactMap)
+        if (approverContactObj) {
+          cells.push({ columnId: columnMap.approver, objectValue: approverContactObj })
         }
       }
       if (columnMap.status) {
@@ -664,8 +673,15 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
         const actualNum = parseCurrency(item.actual)
         cells.push({ columnId: columnMap.actual, value: actualNum ?? '' })
       }
+      if (columnMap.variance) {
+        const varianceNum = parseCurrency(item.variance)
+        cells.push({ columnId: columnMap.variance, value: varianceNum ?? '' })
+      }
       if (columnMap.notes) {
         cells.push({ columnId: columnMap.notes, value: item.notes || '' })
+      }
+      if (columnMap.atRisk) {
+        cells.push({ columnId: columnMap.atRisk, value: item.atRisk || false })
       }
       if (columnMap.skipWbs) {
         cells.push({ columnId: columnMap.skipWbs, value: item.skipWbs || false })
