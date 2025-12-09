@@ -290,21 +290,19 @@ export async function syncWbsFromSmartsheet(sheetId: string, projectCodeFromFold
         }
 
         // Use project code from folder context first, then try to extract from task
-        let projectCode = projectCodeFromFolder
+        let projectCode: string | undefined = projectCodeFromFolder || wbsData.projectCode || undefined
         if (!projectCode) {
-          projectCode = wbsData.projectCode
-          if (!projectCode) {
-            // Build parent chain for hierarchy lookup
-            const parentChain = []
-            let currentRow = row
-            while (currentRow.parentId && rowMap[currentRow.parentId]) {
-              const parent = rowMap[currentRow.parentId]
-              parentChain.push(parent)
-              currentRow = parent
-            }
-            
-            projectCode = extractProjectCodeFromName(wbsData.name, parentChain)
+          // Build parent chain for hierarchy lookup
+          const parentChain = []
+          let currentRow = row
+          while (currentRow.parentId && rowMap[currentRow.parentId]) {
+            const parent = rowMap[currentRow.parentId]
+            parentChain.push(parent)
+            currentRow = parent
           }
+          
+          const extracted = extractProjectCodeFromName(wbsData.name, parentChain)
+          projectCode = extracted || undefined
         }
 
         if (!projectCode) {
