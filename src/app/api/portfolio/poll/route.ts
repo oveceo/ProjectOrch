@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { PortfolioSyncService } from '@/lib/portfolio-sync'
-import { UserRole } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,14 +14,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check permissions (only EO engineers and managers can trigger polling)
-    const allowedRoles: UserRole[] = [UserRole.eo_engineer, UserRole.manager]
-    if (!session.user.role || !allowedRoles.includes(session.user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can trigger portfolio polling
+    console.log(`Portfolio polling triggered by: ${session.user.email || session.user.name}`)
 
     // Trigger portfolio polling
     await PortfolioSyncService.pollPortfolioUpdates()

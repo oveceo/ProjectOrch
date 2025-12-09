@@ -20,15 +20,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Only allow admins to clear cache
-    const adminUsers = ['Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette', 'Adams', 'Allen']
-    if (!adminUsers.includes(userLastName)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
-
+    // All authenticated users can clear cache for fresh sync
     console.log(`Clearing WBS cache requested by: ${userLastName}`)
 
     // Clear all WBS cache entries

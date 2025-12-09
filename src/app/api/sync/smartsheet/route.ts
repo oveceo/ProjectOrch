@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllFromSmartsheet } from '@/lib/smartsheet-sync'
 import { syncAllWbsSheetsInWorkspace, extractProjectCodeFromSheetName } from '@/lib/smartsheet-discovery'
-import { UserRole } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,22 +22,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user role from last name
-    const getUserRole = (lastName: string): UserRole => {
-      const adminUsers = ['Adams', 'Allen', 'Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette']
-      if (adminUsers.includes(lastName)) return UserRole.eo_engineer
-      return UserRole.assignee
-    }
-
-    const userRole = getUserRole(userLastName)
-
-    // Only admin users can trigger syncs
-    if (userRole !== UserRole.eo_engineer) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions. Only EO Engineers can trigger syncs.' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can trigger syncs
+    console.log(`Sync triggered by: ${userLastName}`)
 
     // Parse body (may be empty)
     let body: any = {}
@@ -179,22 +164,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get user role from last name
-    const getUserRole = (lastName: string): UserRole => {
-      const adminUsers = ['Adams', 'Allen', 'Forster', 'Clark', 'Huff', 'Holskey', 'Woodworth', 'Privette']
-      if (adminUsers.includes(lastName)) return UserRole.eo_engineer
-      return UserRole.assignee
-    }
-
-    const userRole = getUserRole(userLastName)
-
-    // Only admin users can check sync status
-    if (userRole !== UserRole.eo_engineer) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions' },
-        { status: 403 }
-      )
-    }
+    // All authenticated users can check sync status
+    console.log(`Sync status check by: ${userLastName}`)
 
     // For now, return a simple status
     // In a real implementation, you'd track sync jobs and their status
