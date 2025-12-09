@@ -840,8 +840,11 @@ async function syncToSmartsheet(sheetId: string, items: any[]): Promise<{ update
             }
           }
         } catch (createError) {
-          const errorMessage = createError instanceof Error ? createError.message : 'Unknown error'
-          apiLogger.error('Failed to create row in Smartsheet', { itemName: item.name, errorMessage })
+          const errorObj = createError instanceof Error 
+            ? createError 
+            : new Error(typeof createError === 'string' ? createError : 'Unknown error')
+          const errorMessage = errorObj.message
+          apiLogger.error('Failed to create row in Smartsheet', errorObj, { itemName: item.name })
           result.errors.push(`Failed to create "${item.name}": ${errorMessage}`)
         }
       }
