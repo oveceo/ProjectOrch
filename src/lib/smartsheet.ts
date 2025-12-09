@@ -197,6 +197,34 @@ export class SmartsheetAPI {
     )
   }
 
+  // Copy folder (copies entire folder with all sheets/dashboards/reports inside)
+  static async copyFolder(sourceFolderId: number, destinationFolderId: number, newName: string): Promise<any> {
+    return withRetry(
+      () => client.folders.copyFolder({
+        folderId: sourceFolderId,
+        body: {
+          destinationType: 'folder',
+          destinationId: destinationFolderId,
+          newName: newName
+        }
+      }),
+      'copyFolder',
+      { sourceFolderId, destinationFolderId, newName }
+    )
+  }
+
+  // Get folder contents
+  static async getFolder(folderId: number): Promise<any> {
+    return withRetry(
+      () => client.folders.getFolder({
+        id: folderId,
+        include: 'sheets,folders'
+      }),
+      'getFolder',
+      { folderId }
+    )
+  }
+
   // Create webhook
   static async createWebhook(sheetId: number, callbackUrl: string, events: string[]): Promise<any> {
     return withRetry(

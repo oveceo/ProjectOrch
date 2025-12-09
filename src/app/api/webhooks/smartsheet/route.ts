@@ -1,0 +1,235 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { SmartsheetAPI } from '@/lib/smartsheet'
+import { logger } from '@/lib/logger'
+
+const apiLogger = logger.child('api:webhooks:smartsheet')
+
+// Smartsheet IDs
+const PORTFOLIO_SHEET_ID = parseInt(process.env.SMARTSHEET_PORTFOLIO_SHEET_ID || '6732698911461252')
+const WBS_TEMPLATE_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_TEMPLATE_FOLDER_ID || '2374072609859460')
+const WBS_PARENT_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_PARENT_FOLDER_ID || '4414766191011716')
+
+/**
+ * POST /api/webhooks/smartsheet - Receive Smartsheet webhook notifications
+ * 
+ * Smartsheet webhooks send:
+ * 1. A verification request (challenge) when setting up
+ * 2. Event notifications when rows are created/updated
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    // Handle Smartsheet webhook verification challenge
+    // Smartsheet sends this when you first create the webhook
+    if (body.challenge) {
+      apiLogger.info('Webhook verification challenge received')
+      return NextResponse.json({ smartsheetHookResponse: body.challenge })
+    }
+
+    // Handle actual webhook events
+    if (body.events && Array.isArray(body.events)) {
+      apiLogger.info('Webhook events received', { eventCount: body.events.length })
+
+      for (const event of body.events) {
+        // Only process row creation events on the portfolio sheet
+        if (event.objectType === 'row' && event.eventType === 'created') {
+          apiLogger.info('New row created event', { 
+            rowId: event.rowId, 
+            sheetId: body.scopeObjectId 
+          })
+
+          // Process asynchronously to respond quickly to Smartsheet
+          processNewRow(event.rowId, body.scopeObjectId).catch(err => {
+            apiLogger.error('Background processing failed', err)
+          })
+        }
+      }
+
+      return NextResponse.json({ success: true, message: 'Events received' })
+    }
+
+    // Unknown payload
+    apiLogger.warn('Unknown webhook payload', { body })
+    return NextResponse.json({ success: true })
+
+  } catch (error) {
+    apiLogger.error('Webhook error', error as Error)
+    // Always return 200 to Smartsheet to prevent retries
+    return NextResponse.json({ success: false, error: 'Processing error' })
+  }
+}
+
+/**
+ * Process a newly created row - create WBS folder if needed
+ */
+async function processNewRow(rowId: number, sheetId: number) {
+  try {
+    // Only process if it's our portfolio sheet
+    if (sheetId !== PORTFOLIO_SHEET_ID) {
+      apiLogger.info('Ignoring event from different sheet', { sheetId })
+      return
+    }
+
+    apiLogger.info('Processing new portfolio row', { rowId })
+
+    // Get the sheet data
+    const sheet = await SmartsheetAPI.getSheet(PORTFOLIO_SHEET_ID)
+    const row = sheet.rows.find(r => r.id === rowId)
+
+    if (!row) {
+      apiLogger.warn('Row not found', { rowId })
+      return
+    }
+
+    // Get project code
+    const projectCode = SmartsheetAPI.getCellValue(row, sheet.columns, '###')
+    if (!projectCode) {
+      apiLogger.info('Row has no project code yet, will be processed later', { rowId })
+      return
+    }
+
+    // Check if WBS is needed
+    const wbsNeeded = SmartsheetAPI.getCellValue(row, sheet.columns, 'Work Breakdown Needed?')
+    if (wbsNeeded === false || wbsNeeded === 'No') {
+      apiLogger.info('WBS not needed for project', { projectCode })
+      return
+    }
+
+    // Check if already has WBS
+    const projectPlan = SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Plan')
+    if (projectPlan) {
+      apiLogger.info('Project already has WBS', { projectCode })
+      return
+    }
+
+    // Get project name
+    const projectName = SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Name') || projectCode
+
+    apiLogger.info('Creating WBS for new project', { projectCode, projectName })
+
+    // Create or get project in database
+    let project = await prisma.project.findUnique({ where: { projectCode } })
+    
+    if (!project) {
+      project = await prisma.project.create({
+        data: {
+          projectCode,
+          title: projectName,
+          status: 'Not_Started',
+          requiresWbs: true,
+          portfolioRowId: rowId.toString()
+        }
+      })
+      apiLogger.info('Created project in database', { projectCode, projectId: project.id })
+    }
+
+    // Skip if already has WBS
+    if (project.wbsSheetId) {
+      apiLogger.info('Project already has WBS in database', { projectCode })
+      return
+    }
+
+    // Create WBS folder structure
+    await createWbsForProject(project, row.id, sheet)
+
+    apiLogger.info('✅ WBS automation completed for new project', { projectCode })
+
+  } catch (error) {
+    apiLogger.error('Error processing new row', error as Error, { rowId })
+  }
+}
+
+/**
+ * Create WBS folder structure for a project
+ */
+async function createWbsForProject(project: any, rowId: number, sheet: any) {
+  const folderName = `WBS (#${project.projectCode})`
+  
+  apiLogger.info('Copying template folder', { 
+    templateId: WBS_TEMPLATE_FOLDER_ID, 
+    newName: folderName 
+  })
+
+  // Step 1: Copy the template folder
+  const copyResponse = await SmartsheetAPI.copyFolder(
+    WBS_TEMPLATE_FOLDER_ID,
+    WBS_PARENT_FOLDER_ID,
+    folderName
+  )
+  
+  const projectFolderId = copyResponse.result.id
+  apiLogger.info('Folder created', { folderName, folderId: projectFolderId })
+
+  // Step 2: Get folder contents to find WBS sheet
+  const folderContents = await SmartsheetAPI.getFolder(projectFolderId)
+  
+  const wbsSheet = folderContents.sheets?.find((s: any) => 
+    s.name === 'Work Breakdown Schedule' || 
+    s.name.toLowerCase().includes('work breakdown')
+  )
+
+  if (!wbsSheet) {
+    throw new Error('WBS sheet not found in copied folder')
+  }
+
+  apiLogger.info('Found WBS sheet', { sheetId: wbsSheet.id, sheetName: wbsSheet.name })
+
+  // Step 3: Update row 1 Name cell with project code
+  const wbsSheetData = await SmartsheetAPI.getSheet(wbsSheet.id)
+  const firstRow = wbsSheetData.rows[0]
+
+  if (firstRow) {
+    const nameColumn = SmartsheetAPI.findColumnByTitle(wbsSheetData.columns, 'Name')
+    if (nameColumn) {
+      await SmartsheetAPI.updateRows(wbsSheet.id, [{
+        id: firstRow.id,
+        cells: [{ columnId: nameColumn.id, value: project.projectCode }]
+      }])
+      apiLogger.info('Updated WBS sheet row 1 with project code', { projectCode: project.projectCode })
+    }
+  }
+
+  // Step 4: Update portfolio row with links
+  const projectPlanColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Project Plan')
+  const wbsAppLinkColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'WBS App Link')
+
+  const cells = []
+  if (projectPlanColumn) {
+    cells.push({
+      columnId: projectPlanColumn.id,
+      value: 'Work Breakdown Schedule',
+      hyperlink: { url: wbsSheet.permalink }
+    })
+  }
+  if (wbsAppLinkColumn) {
+    cells.push({
+      columnId: wbsAppLinkColumn.id,
+      value: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
+    })
+  }
+
+  if (cells.length > 0) {
+    await SmartsheetAPI.updateRows(PORTFOLIO_SHEET_ID, [{ id: rowId, cells }])
+    apiLogger.info('Updated portfolio row with WBS links')
+  }
+
+  // Step 5: Update database
+  await prisma.project.update({
+    where: { id: project.id },
+    data: {
+      wbsFolderId: projectFolderId.toString(),
+      wbsSheetId: wbsSheet.id.toString(),
+      wbsSheetUrl: wbsSheet.permalink,
+      wbsAppUrl: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
+    }
+  })
+
+  apiLogger.info('✅ WBS structure created successfully', { 
+    projectCode: project.projectCode,
+    folderId: projectFolderId,
+    sheetId: wbsSheet.id
+  })
+}
+

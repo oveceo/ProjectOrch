@@ -331,9 +331,10 @@ function SettingsContent() {
 
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            <TabsTrigger value="automation">Automation</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
           </TabsList>
 
@@ -552,6 +553,122 @@ function SettingsContent() {
                     <Save className="mr-2 h-4 w-4" />
                     {saving ? 'Saving...' : 'Save Preferences'}
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Automation Settings */}
+          <TabsContent value="automation" className="space-y-6">
+            <Card className="corporate-card">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Zap className="mr-2 h-5 w-5 text-yellow-500" />
+                  WBS Folder Automation
+                </CardTitle>
+                <CardDescription>
+                  Automatically create WBS folders when new projects are submitted via Smartsheet form
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <Zap className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800">How it works</AlertTitle>
+                  <AlertDescription className="text-blue-700">
+                    When a new project is submitted through the Smartsheet form:
+                    <ol className="list-decimal ml-4 mt-2 space-y-1">
+                      <li>A new row is added to the Portfolio sheet with project code (P-XXXX)</li>
+                      <li>The webhook automatically detects the new row</li>
+                      <li>The template folder is copied and renamed to WBS (#P-XXXX)</li>
+                      <li>Row 1 in the WBS sheet is updated with the project code</li>
+                      <li>Links are added back to the Portfolio sheet</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="font-medium">Setup Webhook</h4>
+                      <p className="text-sm text-gray-500">Register webhook with Smartsheet to enable automation</p>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/webhooks/smartsheet/setup', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${user?.lastName}` }
+                          })
+                          const data = await response.json()
+                          if (data.success) {
+                            alert('✅ Webhook created successfully! Automation is now active.')
+                          } else {
+                            alert('❌ Failed to create webhook: ' + (data.message || data.error))
+                          }
+                        } catch (err) {
+                          alert('Error setting up webhook')
+                        }
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Zap className="mr-2 h-4 w-4" />
+                      Enable Automation
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="font-medium">Manual Trigger</h4>
+                      <p className="text-sm text-gray-500">Check for new projects and create WBS folders now</p>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/portfolio/new-projects', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${user?.lastName}` }
+                          })
+                          const data = await response.json()
+                          alert(data.message || 'Check completed')
+                        } catch (err) {
+                          alert('Error checking for new projects')
+                        }
+                      }}
+                      variant="outline"
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Run Now
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h4 className="font-medium">Check Webhook Status</h4>
+                      <p className="text-sm text-gray-500">View active webhooks for Portfolio sheet</p>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/webhooks/smartsheet/setup', {
+                            method: 'GET',
+                            headers: { 'Authorization': `Bearer ${user?.lastName}` }
+                          })
+                          const data = await response.json()
+                          if (data.portfolioWebhooks > 0) {
+                            alert(`✅ ${data.portfolioWebhooks} webhook(s) active for Portfolio sheet`)
+                          } else {
+                            alert('⚠️ No webhooks found. Click "Enable Automation" to set up.')
+                          }
+                        } catch (err) {
+                          alert('Error checking webhook status')
+                        }
+                      }}
+                      variant="outline"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Check Status
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

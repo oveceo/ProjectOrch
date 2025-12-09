@@ -40,6 +40,7 @@ declare module 'smartsheet' {
     folders: {
       getFolder: (options: { id: number; include?: string }) => Promise<any>
       createFolder: (options: { body: any; folderId?: number; workspaceId?: number }) => Promise<any>
+      copyFolder: (options: { folderId: number; body: { destinationType: string; destinationId: number; newName: string } }) => Promise<any>
       listFolders?: (options: any) => Promise<any>
     }
     webhooks: {

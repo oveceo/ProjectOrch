@@ -5,8 +5,8 @@ import { AuditEntry } from '@/types'
 
 // Smartsheet Portfolio sheet configuration
 const PORTFOLIO_SHEET_ID = parseInt(process.env.SMARTSHEET_PORTFOLIO_SHEET_ID || '6732698911461252')
-const WBS_TEMPLATE_SHEET_ID = parseInt(process.env.SMARTSHEET_WBS_TEMPLATE_SHEET_ID || '2074433216794500')
-const WBS_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_FOLDER_ID || '4414766191011716')
+const WBS_TEMPLATE_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_TEMPLATE_FOLDER_ID || '2374072609859460')  // "Work Breakdown Schedule (Save As New)" folder
+const WBS_PARENT_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_PARENT_FOLDER_ID || '4414766191011716')      // "Work Breakdown Schedules" parent folder
 
 // Column mapping for Portfolio sheet
 const PORTFOLIO_COLUMNS = {
@@ -201,52 +201,64 @@ export class PortfolioSyncService {
     try {
       console.log(`Creating WBS structure for project ${project.projectCode}`)
 
-      // Step 1: Create project-specific folder
+      // Step 1: Copy the entire template folder (includes WBS sheet, dashboards, reports)
       const folderName = `WBS (#${project.projectCode})`
-      const folderResponse = await SmartsheetAPI.createFolder(folderName, WBS_FOLDER_ID)
-      const projectFolderId = folderResponse.result.id
+      console.log(`Copying template folder ${WBS_TEMPLATE_FOLDER_ID} to create: ${folderName}`)
+      
+      const copyResponse = await SmartsheetAPI.copyFolder(
+        WBS_TEMPLATE_FOLDER_ID,
+        WBS_PARENT_FOLDER_ID,
+        folderName
+      )
+      
+      const projectFolderId = copyResponse.result.id
+      console.log(`✅ Created folder: ${folderName} (ID: ${projectFolderId})`)
 
-      console.log(`Created folder: ${folderName} (ID: ${projectFolderId})`)
-
-      // Step 2: Copy template to create new WBS sheet in the project folder
-      const newSheet = await SmartsheetAPI.copySheet(
-        WBS_TEMPLATE_SHEET_ID,
-        `Work Breakdown Schedule`,
-        projectFolderId
+      // Step 2: Get the copied folder contents to find the WBS sheet
+      const folderContents = await SmartsheetAPI.getFolder(projectFolderId)
+      console.log(`Folder contents: ${folderContents.sheets?.length || 0} sheets`)
+      
+      // Find the "Work Breakdown Schedule" sheet in the copied folder
+      const wbsSheet = folderContents.sheets?.find((sheet: any) => 
+        sheet.name === 'Work Breakdown Schedule' || 
+        sheet.name.toLowerCase().includes('work breakdown')
       )
 
-      console.log(`Created WBS sheet: Work Breakdown Schedule (ID: ${newSheet.result.id})`)
+      if (!wbsSheet) {
+        console.error('Could not find Work Breakdown Schedule sheet in copied folder')
+        throw new Error('WBS sheet not found in copied folder')
+      }
 
-      // Step 3: Update the first row with project code
-      const sheet = await SmartsheetAPI.getSheet(newSheet.result.id)
+      console.log(`Found WBS sheet: ${wbsSheet.name} (ID: ${wbsSheet.id})`)
+
+      // Step 3: Update the first row's Name cell with project code
+      const sheet = await SmartsheetAPI.getSheet(wbsSheet.id)
       const firstRow = sheet.rows[0]
 
       if (firstRow) {
-        const wbsColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'WBS')
         const nameColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Name')
 
-        if (wbsColumn && nameColumn) {
-          await SmartsheetAPI.updateRows(newSheet.result.id, [{
+        if (nameColumn) {
+          await SmartsheetAPI.updateRows(wbsSheet.id, [{
             id: firstRow.id,
             cells: [
-              SmartsheetAPI.createCell(wbsColumn.id, project.projectCode),
-              SmartsheetAPI.createCell(nameColumn.id, 'Work Breakdown Schedule')
+              SmartsheetAPI.createCell(nameColumn.id, project.projectCode)
             ]
           }])
-          console.log(`Updated WBS sheet header with project code: ${project.projectCode}`)
+          console.log(`✅ Updated WBS sheet row 1 Name cell with: ${project.projectCode}`)
         }
       }
 
       // Step 4: Create hyperlinks in Portfolio sheet
-      await this.updatePortfolioLinks(project, newSheet.result.id, newSheet.result.permalink)
+      await this.updatePortfolioLinks(project, wbsSheet.id, wbsSheet.permalink)
 
       // Step 5: Update project record with folder and sheet info
       await prisma.project.update({
         where: { id: project.id },
         data: {
           wbsFolderId: projectFolderId.toString(),
-          wbsSheetId: newSheet.result.id.toString(),
-          wbsSheetUrl: newSheet.result.permalink,
+          wbsSheetId: wbsSheet.id.toString(),
+          wbsSheetUrl: wbsSheet.permalink,
           wbsAppUrl: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
         }
       })
