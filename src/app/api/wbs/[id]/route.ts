@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { logger, startTimer } from '@/lib/logger'
 import { extractUserLastName, updateWbsTaskSchema, parseValidation, formatValidationErrors } from '@/lib/validation'
+import { ProjectStatus } from '@prisma/client'
 
 const apiLogger = logger.child('api:wbs')
 
@@ -148,6 +149,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const updateData = validation.data
 
+    // Map incoming status to Prisma enum, falling back to Not_Started
+    const statusToProjectStatus = (status: string): ProjectStatus => {
+      switch (status) {
+        case 'In_Progress':
+        case 'Complete':
+        case 'Blocked':
+        case 'At_Risk':
+        case 'Not_Started':
+          return status as ProjectStatus
+        default:
+          return 'Not_Started'
+      }
+    }
+
     apiLogger.debug('Updating WBS task', { taskId: id, userLastName, updates: Object.keys(updateData) })
 
     // Check if task exists
@@ -179,6 +194,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       where: { id },
       data: {
         ...updateData,
+        ...(updateData.status ? { status: statusToProjectStatus(updateData.status) } : {}),
         lastSyncedAt: new Date(), // Mark as needing sync
       },
       include: {
