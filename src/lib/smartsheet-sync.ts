@@ -635,10 +635,12 @@ function extractWbsDataFromRow(row: SmartsheetWbsRow, columns: any[]): Partial<a
       wbsData.notes = cell.value || cell.displayValue
     }
     if (columnTitle === WBS_COLUMN_MAPPING.atRisk) {
-      wbsData.atRisk = cell.value === 'true' || cell.displayValue?.toLowerCase() === 'yes'
+      const val = cell.value as unknown
+      wbsData.atRisk = val === true || val === 'true' || cell.displayValue?.toLowerCase() === 'yes'
     }
     if (columnTitle === WBS_COLUMN_MAPPING.skipWbs) {
-      wbsData.skipWbs = cell.value === true || cell.value === 'true' || cell.displayValue?.toLowerCase() === 'yes'
+      const val = cell.value as unknown
+      wbsData.skipWbs = val === true || val === 'true' || cell.displayValue?.toLowerCase() === 'yes'
     }
     if (columnTitle === WBS_COLUMN_MAPPING.projectCode) {
       wbsData.projectCode = cell.value || cell.displayValue
