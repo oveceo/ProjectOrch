@@ -1,7 +1,36 @@
 declare module 'smartsheet' {
+  export interface SmartsheetCell {
+    columnId: number
+    value?: any
+    displayValue?: string
+  }
+
+  export interface SmartsheetRow {
+    id: number
+    parentId?: number
+    cells: SmartsheetCell[]
+    expanded?: boolean
+    createdAt?: string
+    modifiedAt?: string
+  }
+
+  export interface SmartsheetColumn {
+    id: number
+    title: string
+    type: string
+    primary?: boolean
+  }
+
+  export interface SmartsheetSheet {
+    id: number
+    name: string
+    columns: SmartsheetColumn[]
+    rows: SmartsheetRow[]
+  }
+
   export interface Client {
     sheets: {
-      getSheet: (options: { id: number }) => Promise<any>
+      getSheet: (options: { id: number }) => Promise<SmartsheetSheet>
       addRows: (options: { sheetId: number; body: any[] }) => Promise<any>
       updateRows: (options: { sheetId: number; body: any[] }) => Promise<any>
       deleteRows: (options: { sheetId: number; ids: number[] }) => Promise<any>
