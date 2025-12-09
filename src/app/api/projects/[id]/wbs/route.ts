@@ -81,7 +81,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const getValue = (columnTitle: string) => SmartsheetAPI.getCellValue(row, columns, columnTitle)
       
       const statusValue = getValue('Status') || 'Not Started'
-      const mappedStatus = STATUS_FROM_SMARTSHEET[statusValue] || 'Not_Started'
+      const mappedStatus = (STATUS_FROM_SMARTSHEET[statusValue] || 'Not_Started') as ProjectStatus
 
       return {
         smartsheetRowId: String(row.id),
