@@ -160,8 +160,7 @@ export async function POST(request: NextRequest) {
         parentId: parentId || null,
         ownerLastName: null,
         approverLastName: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        lastSyncedAt: new Date()
       },
       include: {
         project: {
