@@ -244,7 +244,6 @@ export class PortfolioSyncService {
       await prisma.project.update({
         where: { id: project.id },
         data: {
-          wbsFolderId: projectFolderId.toString(),
           wbsSheetId: newSheet.result.id.toString(),
           wbsSheetUrl: newSheet.result.permalink,
           wbsAppUrl: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
