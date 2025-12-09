@@ -17,6 +17,10 @@ interface CreateWbsProjectRequest {
   createdBy: string
 }
 
+type WbsTemplateResult = 
+  | { success: true; sheetId: any; sheetName: string }
+  | { success: false; error: string }
+
 export async function POST(request: NextRequest) {
   try {
     // Get user from Authorization header
@@ -157,7 +161,7 @@ async function createSmartsheetWbsStructure(projectCode: string, projectTitle: s
     console.log(`Created folder: ${folderName} (ID: ${projectFolderId})`)
 
     // Step 2: Create the WBS sheet using template system
-    const wbsResult = await createWbsSheetFromTemplate(
+    const wbsResult: WbsTemplateResult = await createWbsSheetFromTemplate(
       projectCode, 
       projectTitle, 
       projectFolderId
