@@ -256,23 +256,13 @@ export class PortfolioSyncService {
         }
       }
 
-      // Copy reports - need to figure out the correct API approach
-      for (const templateReport of (templateFolder.reports || [])) {
-        try {
-          console.log(`Copying report: ${templateReport.name} (ID: ${templateReport.id})`)
-          console.log(`Report data:`, JSON.stringify(templateReport, null, 2))
-          
-          // Try to get the report first to verify the ID is valid
-          const reportDetails = await SmartsheetAPI.getReport(templateReport.id)
-          console.log(`Report details fetched successfully:`, reportDetails.name)
-          
-          // Now try to copy it
-          await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
-          console.log(`✅ Copied report: ${templateReport.name}`)
-        } catch (err: any) {
-          console.error(`❌ Failed to copy report "${templateReport.name}":`, err.message)
-          console.error(`Full error:`, err)
-        }
+      // KNOWN LIMITATION: Smartsheet API does NOT have a public endpoint for copying reports
+      // The POST /reports/{reportId}/copy endpoint does not exist (returns 404)
+      // Reports must be created manually in Smartsheet UI after WBS folder is created
+      if (templateFolder.reports?.length > 0) {
+        console.log(`⚠️ REPORTS SKIPPED (${templateFolder.reports.length}): Smartsheet API has no copy endpoint for reports`)
+        console.log(`   Reports in template: ${templateFolder.reports.map((r: any) => r.name).join(', ')}`)
+        console.log(`   → User must create reports manually using Smartsheet UI`)
       }
 
       // Copy dashboards (optional - don't fail if dashboards can't be copied)
