@@ -217,7 +217,12 @@ export class PortfolioSyncService {
 
       // Step 2: Get template folder contents
       const templateFolder = await SmartsheetAPI.getFolder(WBS_TEMPLATE_FOLDER_ID)
-      console.log(`Template folder has ${templateFolder.sheets?.length || 0} sheets, ${templateFolder.reports?.length || 0} reports, ${templateFolder.sights?.length || 0} dashboards`)
+      console.log(`📁 Template folder ID: ${WBS_TEMPLATE_FOLDER_ID}`)
+      console.log(`📁 Template folder contents:`)
+      console.log(`   - Sheets: ${templateFolder.sheets?.length || 0}`)
+      console.log(`   - Reports: ${templateFolder.reports?.length || 0}`)
+      console.log(`   - Dashboards (sights): ${templateFolder.sights?.length || 0}`)
+      console.log(`📁 Full template folder response:`, JSON.stringify(templateFolder, null, 2))
 
       // Step 3: Copy ALL items from template to new folder (sheets, reports, dashboards)
       let wbsSheetId: number | null = null

@@ -59,7 +59,28 @@ export async function POST(request: NextRequest) {
       created: 0,
       skipped: 0,
       pendingApproval: 0,
+      removed: 0,
       errors: [] as string[]
+    }
+
+    // CLEANUP: Get all project codes from portfolio and remove any that are no longer there
+    const portfolioProjectCodes = new Set<string>()
+    for (const row of sheet.rows) {
+      const code = SmartsheetAPI.getCellValue(row, sheet.columns, '###')
+      if (code) portfolioProjectCodes.add(code)
+    }
+    
+    // Find and remove projects no longer in portfolio
+    const allDbProjects = await prisma.project.findMany({ select: { id: true, projectCode: true } })
+    for (const dbProject of allDbProjects) {
+      if (!portfolioProjectCodes.has(dbProject.projectCode)) {
+        apiLogger.info('Removing project not in portfolio', { projectCode: dbProject.projectCode })
+        // Delete related WBS cache entries first
+        await prisma.wbsCache.deleteMany({ where: { projectId: dbProject.id } })
+        // Delete the project
+        await prisma.project.delete({ where: { id: dbProject.id } })
+        results.removed++
+      }
     }
 
     // Process each row
@@ -140,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Checked ${results.checked} rows: created ${results.created} WBS folders, ${results.pendingApproval} pending approval, ${results.skipped} skipped`,
+      message: `Checked ${results.checked} rows: created ${results.created} WBS folders, ${results.pendingApproval} pending approval, ${results.skipped} skipped, ${results.removed} removed from DB`,
       results
     })
 

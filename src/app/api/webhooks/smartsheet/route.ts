@@ -32,9 +32,18 @@ export async function POST(request: NextRequest) {
 
     // Handle actual webhook events
     if (body.events && Array.isArray(body.events)) {
-      apiLogger.info('Webhook events received', { eventCount: body.events.length })
+      apiLogger.info('Webhook events received', { 
+        eventCount: body.events.length,
+        scopeObjectId: body.scopeObjectId,
+        webhookId: body.webhookId
+      })
+      
+      // Log full payload for debugging
+      console.log('📥 WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2))
 
       for (const event of body.events) {
+        console.log('📥 EVENT:', JSON.stringify(event, null, 2))
+        
         // ONLY process row UPDATES (when approval status changes to Approved)
         // NOT row creation - projects start as pending and could get denied
         if (event.objectType === 'row' && event.eventType === 'updated') {
@@ -46,6 +55,11 @@ export async function POST(request: NextRequest) {
           // Process asynchronously to respond quickly to Smartsheet
           processNewRow(event.rowId, body.scopeObjectId).catch(err => {
             apiLogger.error('Background processing failed', err)
+          })
+        } else {
+          apiLogger.info('Ignoring non-update event', { 
+            objectType: event.objectType, 
+            eventType: event.eventType 
           })
         }
       }
