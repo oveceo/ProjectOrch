@@ -11,7 +11,8 @@ const nextConfig = {
 
   // External packages for server components
   experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'pino']
+    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'pino'],
+    instrumentationHook: true, // Enable auto-webhook registration on startup
   },
 
   // Production optimizations
