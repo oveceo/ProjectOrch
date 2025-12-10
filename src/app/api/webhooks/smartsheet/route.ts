@@ -166,87 +166,66 @@ async function processNewRow(rowId: number, sheetId: number) {
 /**
  * Create WBS folder structure for a project
  * 
- * Steps:
- * 1. Create new empty folder named "WBS (#P-XXXX)"
- * 2. Get template folder contents
- * 3. Copy each sheet from template to new folder
- * 4. Update row 1 Name cell with project code in the WBS sheet
+ * Uses "Save as New" approach - copy the entire template folder
+ * This copies everything (sheets, reports, dashboards) with proper references
  */
 async function createWbsForProject(project: any, rowId: number, sheet: any) {
   const folderName = `WBS (#${project.projectCode})`
   
-  apiLogger.info('Creating WBS folder structure', { 
+  apiLogger.info('Creating WBS folder structure (folder copy)', { 
     projectCode: project.projectCode,
-    folderName 
+    folderName,
+    templateFolderId: WBS_TEMPLATE_FOLDER_ID,
+    parentFolderId: WBS_PARENT_FOLDER_ID
   })
 
-  // Step 1: Create new empty folder
-  const createFolderResponse = await SmartsheetAPI.createFolder(folderName, WBS_PARENT_FOLDER_ID)
-  const projectFolderId = createFolderResponse.result.id
-  apiLogger.info('Created empty folder', { folderName, folderId: projectFolderId })
+  // Copy the ENTIRE template folder (like "Save as New" in UI)
+  // This should copy sheets, reports, AND dashboards with proper references
+  console.log(`📁 Copying template folder ${WBS_TEMPLATE_FOLDER_ID} as: ${folderName}`)
+  
+  const copyResult = await SmartsheetAPI.copyFolder(
+    WBS_TEMPLATE_FOLDER_ID,
+    WBS_PARENT_FOLDER_ID,
+    folderName
+  )
+  
+  const projectFolderId = copyResult.result?.id || copyResult.id
+  console.log(`✅ Copied template folder as: ${folderName} (ID: ${projectFolderId})`)
+  apiLogger.info('Copied template folder', { folderName, folderId: projectFolderId })
 
-  // Step 2: Get template folder contents
-  const templateFolder = await SmartsheetAPI.getFolder(WBS_TEMPLATE_FOLDER_ID)
-  console.log('📁 TEMPLATE FOLDER ID:', WBS_TEMPLATE_FOLDER_ID)
-  console.log('📁 TEMPLATE FOLDER FULL RESPONSE:', JSON.stringify(templateFolder, null, 2))
-  apiLogger.info('Template folder contents', { 
-    sheets: templateFolder.sheets?.length || 0,
-    reports: templateFolder.reports?.length || 0,
-    dashboards: templateFolder.sights?.length || 0
+  // Get the new folder to find the WBS sheet and verify contents
+  const newFolder = await SmartsheetAPI.getFolder(projectFolderId)
+  console.log(`📁 New folder contents:`)
+  console.log(`   - Sheets: ${newFolder.sheets?.length || 0}`)
+  console.log(`   - Reports: ${newFolder.reports?.length || 0}`)
+  console.log(`   - Dashboards: ${newFolder.sights?.length || 0}`)
+  
+  apiLogger.info('New folder contents', { 
+    sheets: newFolder.sheets?.length || 0,
+    reports: newFolder.reports?.length || 0,
+    dashboards: newFolder.sights?.length || 0
   })
 
-  // Step 3: Copy ALL items from template to new folder (sheets, reports, dashboards)
+  // Find the WBS sheet in the copied folder
   let wbsSheetId: number | null = null
   let wbsSheetPermalink: string | null = null
   
-  // Copy sheets
-  for (const templateSheet of (templateFolder.sheets || [])) {
-    apiLogger.info('Copying sheet', { sheetName: templateSheet.name, sheetId: templateSheet.id })
-    
-    const copyResult = await SmartsheetAPI.copySheet(
-      templateSheet.id,
-      templateSheet.name, // Keep same name
-      projectFolderId
-    )
-    
-    // Track the WBS sheet for updating
-    if (templateSheet.name === 'Work Breakdown Schedule' || 
-        templateSheet.name.toLowerCase().includes('work breakdown')) {
-      wbsSheetId = copyResult.result.id
-      wbsSheetPermalink = copyResult.result.permalink
-      apiLogger.info('Found and copied WBS sheet', { newSheetId: wbsSheetId })
-    }
-  }
-
-  // KNOWN LIMITATION: Smartsheet API does NOT have a public endpoint for copying reports
-  // The POST /reports/{reportId}/copy endpoint does not exist (returns 404)
-  // Reports must be created manually in Smartsheet UI after WBS folder is created
-  if (templateFolder.reports?.length > 0) {
-    console.log(`⚠️ REPORTS SKIPPED (${templateFolder.reports.length}): Smartsheet API has no copy endpoint for reports`)
-    console.log(`   Reports in template: ${templateFolder.reports.map((r: any) => r.name).join(', ')}`)
-    console.log(`   → User must create reports manually using Smartsheet UI`)
-    apiLogger.info('Reports skipped - API limitation', { 
-      count: templateFolder.reports.length,
-      names: templateFolder.reports.map((r: any) => r.name)
-    })
-  }
-
-  // Copy dashboards (optional - don't fail if dashboards can't be copied)
-  for (const templateDashboard of (templateFolder.sights || [])) {
-    try {
-      apiLogger.info('Copying dashboard', { dashboardName: templateDashboard.name, dashboardId: templateDashboard.id })
-      await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
-      apiLogger.info('✅ Copied dashboard', { dashboardName: templateDashboard.name })
-    } catch (err) {
-      apiLogger.warn('⚠️ Could not copy dashboard - may need manual setup', { dashboardName: templateDashboard.name })
+  for (const copiedSheet of (newFolder.sheets || [])) {
+    if (copiedSheet.name === 'Work Breakdown Schedule' || 
+        copiedSheet.name.toLowerCase().includes('work breakdown')) {
+      wbsSheetId = copiedSheet.id
+      wbsSheetPermalink = copiedSheet.permalink
+      console.log(`Found WBS sheet: ${wbsSheetId}`)
+      apiLogger.info('Found WBS sheet in copied folder', { sheetId: wbsSheetId })
+      break
     }
   }
 
   if (!wbsSheetId) {
-    throw new Error('WBS sheet not found in template folder')
+    throw new Error('WBS sheet not found in copied folder')
   }
 
-  // Step 4: Update row 1 Name cell with project code
+  // Update row 1 Name cell with project code
   const wbsSheetData = await SmartsheetAPI.getSheet(wbsSheetId)
   const firstRow = wbsSheetData.rows[0]
 
