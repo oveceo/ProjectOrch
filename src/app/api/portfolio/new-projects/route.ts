@@ -8,6 +8,7 @@ const apiLogger = logger.child('api:portfolio:new-projects')
 
 // Smartsheet IDs
 const PORTFOLIO_SHEET_ID = parseInt(process.env.SMARTSHEET_PORTFOLIO_SHEET_ID || '6732698911461252')
+const WBS_PARENT_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_PARENT_FOLDER_ID || '4414766191011716')
 
 /**
  * POST /api/portfolio/new-projects - Check for new projects and create WBS folders
@@ -35,11 +36,16 @@ export async function POST(request: NextRequest) {
     const sheet = await SmartsheetAPI.getSheet(PORTFOLIO_SHEET_ID)
     apiLogger.info('Portfolio sheet loaded', { rowCount: sheet.rows.length })
 
+    // Get existing WBS folders to prevent duplicates
+    const existingFolders = await SmartsheetAPI.getFolder(WBS_PARENT_FOLDER_ID)
+    const existingFolderNames = new Set(
+      (existingFolders.folders || []).map((f: any) => f.name.toLowerCase())
+    )
+    apiLogger.info('Existing WBS folders loaded', { count: existingFolderNames.size })
+
     // Find column IDs
     const projectCodeCol = SmartsheetAPI.findColumnByTitle(sheet.columns, '###')
     const projectNameCol = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Project Name')
-    const wbsNeededCol = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Work Breakdown Needed?')
-    const projectPlanCol = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Project Plan')
 
     if (!projectCodeCol) {
       return NextResponse.json({ 
@@ -52,6 +58,7 @@ export async function POST(request: NextRequest) {
       checked: 0,
       created: 0,
       skipped: 0,
+      pendingApproval: 0,
       errors: [] as string[]
     }
 
@@ -65,25 +72,14 @@ export async function POST(request: NextRequest) {
         continue // Skip rows without project code
       }
 
-      // Check if WBS is needed (if column exists)
-      let wbsNeeded = true
-      if (wbsNeededCol) {
-        const wbsValue = SmartsheetAPI.getCellValue(row, sheet.columns, 'Work Breakdown Needed?')
-        wbsNeeded = wbsValue === true || wbsValue === 'Yes' || wbsValue === 'TRUE'
-      }
-
-      // Check if already has a project plan link (WBS already exists)
-      const projectPlanValue = projectPlanCol 
-        ? SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Plan')
-        : null
-      
-      const alreadyHasWbs = !!projectPlanValue
-
-      // Skip if doesn't need WBS or already has one
-      if (!wbsNeeded || alreadyHasWbs) {
-        results.skipped++
+      // THE ONLY TRIGGER: Approval Status = "Approved"
+      const approvalStatus = SmartsheetAPI.getCellValue(row, sheet.columns, 'Approval Status')
+      if (approvalStatus !== 'Approved') {
+        results.pendingApproval++
         continue
       }
+      
+      apiLogger.info('Approved project found', { projectCode })
 
       // Check if project exists in our database
       let project = await prisma.project.findUnique({
@@ -109,9 +105,17 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Check if project already has WBS folder
+      // Check if project already has WBS folder in database
       if (project.wbsSheetId) {
-        apiLogger.info('Project already has WBS', { projectCode })
+        apiLogger.info('Project already has WBS in database', { projectCode })
+        results.skipped++
+        continue
+      }
+
+      // Check if WBS folder already exists in Smartsheet (prevent duplicates)
+      const expectedFolderName = `WBS (#${projectCode})`.toLowerCase()
+      if (existingFolderNames.has(expectedFolderName)) {
+        apiLogger.info('WBS folder already exists in Smartsheet', { projectCode, folderName: `WBS (#${projectCode})` })
         results.skipped++
         continue
       }
@@ -136,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Checked ${results.checked} rows, created ${results.created} WBS folders, skipped ${results.skipped}`,
+      message: `Checked ${results.checked} rows: created ${results.created} WBS folders, ${results.pendingApproval} pending approval, ${results.skipped} skipped`,
       results
     })
 

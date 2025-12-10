@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
       apiLogger.info('Webhook events received', { eventCount: body.events.length })
 
       for (const event of body.events) {
-        // Only process row creation events on the portfolio sheet
-        if (event.objectType === 'row' && event.eventType === 'created') {
-          apiLogger.info('New row created event', { 
+        // Process row creation AND updates (approval status might change)
+        if (event.objectType === 'row' && (event.eventType === 'created' || event.eventType === 'updated')) {
+          apiLogger.info('Row event received', { 
             rowId: event.rowId, 
+            eventType: event.eventType,
             sheetId: body.scopeObjectId 
           })
 
@@ -86,28 +87,33 @@ async function processNewRow(rowId: number, sheetId: number) {
     // Get project code
     const projectCode = SmartsheetAPI.getCellValue(row, sheet.columns, '###')
     if (!projectCode) {
-      apiLogger.info('Row has no project code yet, will be processed later', { rowId })
+      apiLogger.info('Row has no project code yet', { rowId })
       return
     }
 
-    // Check if WBS is needed
-    const wbsNeeded = SmartsheetAPI.getCellValue(row, sheet.columns, 'Work Breakdown Needed?')
-    if (wbsNeeded === false || wbsNeeded === 'No') {
-      apiLogger.info('WBS not needed for project', { projectCode })
+    // THE ONLY TRIGGER: Approval Status = "Approved"
+    const approvalStatus = SmartsheetAPI.getCellValue(row, sheet.columns, 'Approval Status')
+    if (approvalStatus !== 'Approved') {
+      apiLogger.info('Project not approved yet', { projectCode, approvalStatus })
       return
     }
 
-    // Check if already has WBS
-    const projectPlan = SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Plan')
-    if (projectPlan) {
-      apiLogger.info('Project already has WBS', { projectCode })
+    // Check if WBS folder already exists in Smartsheet (prevent duplicates)
+    const existingFolders = await SmartsheetAPI.getFolder(WBS_PARENT_FOLDER_ID)
+    const existingFolderNames = new Set(
+      (existingFolders.folders || []).map((f: any) => f.name.toLowerCase())
+    )
+    const expectedFolderName = `WBS (#${projectCode})`.toLowerCase()
+    
+    if (existingFolderNames.has(expectedFolderName)) {
+      apiLogger.info('WBS folder already exists in Smartsheet, skipping', { projectCode })
       return
     }
 
     // Get project name
     const projectName = SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Name') || projectCode
 
-    apiLogger.info('Creating WBS for new project', { projectCode, projectName })
+    apiLogger.info('Creating WBS for approved project', { projectCode, projectName })
 
     // Create or get project in database
     let project = await prisma.project.findUnique({ where: { projectCode } })
