@@ -575,12 +575,13 @@ function SettingsContent() {
                   <Zap className="h-4 w-4 text-blue-600" />
                   <AlertTitle className="text-blue-800">How it works</AlertTitle>
                   <AlertDescription className="text-blue-700">
-                    When a new project is submitted through the Smartsheet form:
+                    When a project's approval status changes to "Approved":
                     <ol className="list-decimal ml-4 mt-2 space-y-1">
-                      <li>A new row is added to the Portfolio sheet with project code (P-XXXX)</li>
-                      <li>The webhook automatically detects the new row</li>
-                      <li>The template folder is copied and renamed to WBS (#P-XXXX)</li>
-                      <li>Row 1 in the WBS sheet is updated with the project code</li>
+                      <li>Smartsheet sends a webhook notification for the row update</li>
+                      <li>The system checks if Approval Status = "Approved"</li>
+                      <li>Creates a new folder named WBS (#P-XXXX)</li>
+                      <li>Copies all sheets from the template folder into the new folder</li>
+                      <li>Updates row 1 in the WBS sheet with the project code</li>
                       <li>Links are added back to the Portfolio sheet</li>
                     </ol>
                   </AlertDescription>

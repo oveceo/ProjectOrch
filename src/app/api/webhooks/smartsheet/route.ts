@@ -15,7 +15,9 @@ const WBS_PARENT_FOLDER_ID = parseInt(process.env.SMARTSHEET_WBS_PARENT_FOLDER_I
  * 
  * Smartsheet webhooks send:
  * 1. A verification request (challenge) when setting up
- * 2. Event notifications when rows are created/updated
+ * 2. Event notifications when rows are UPDATED (approval status changes)
+ * 
+ * TRIGGER: Row updated + Approval Status = "Approved" → Create WBS folder
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,11 +35,11 @@ export async function POST(request: NextRequest) {
       apiLogger.info('Webhook events received', { eventCount: body.events.length })
 
       for (const event of body.events) {
-        // Process row creation AND updates (approval status might change)
-        if (event.objectType === 'row' && (event.eventType === 'created' || event.eventType === 'updated')) {
-          apiLogger.info('Row event received', { 
-            rowId: event.rowId, 
-            eventType: event.eventType,
+        // ONLY process row UPDATES (when approval status changes to Approved)
+        // NOT row creation - projects start as pending and could get denied
+        if (event.objectType === 'row' && event.eventType === 'updated') {
+          apiLogger.info('Row updated event received', { 
+            rowId: event.rowId,
             sheetId: body.scopeObjectId 
           })
 
