@@ -258,7 +258,7 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
   apiLogger.info('✅ WBS structure created successfully', { 
     projectCode: project.projectCode,
     folderId: projectFolderId,
-    sheetId: wbsSheet.id
+    sheetId: wbsSheetId
   })
 }
 
