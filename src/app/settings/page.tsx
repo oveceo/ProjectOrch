@@ -625,12 +625,20 @@ function SettingsContent() {
                     <Button
                       onClick={async () => {
                         try {
+                          // Step 1: Check for new projects
                           const response = await fetch('/api/portfolio/new-projects', {
                             method: 'POST',
                             headers: { 'Authorization': `Bearer ${user?.lastName}` }
                           })
                           const data = await response.json()
-                          alert(data.message || 'Check completed')
+                          
+                          // Step 2: Auto-trigger sync from Smartsheet
+                          await fetch('/api/sync/smartsheet', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${user?.lastName}` }
+                          })
+                          
+                          alert((data.message || 'Check completed') + '\n\nSync from Smartsheet triggered!')
                         } catch (err) {
                           alert('Error checking for new projects')
                         }
