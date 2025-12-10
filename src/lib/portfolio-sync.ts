@@ -242,10 +242,24 @@ export class PortfolioSyncService {
         }
       }
 
-      // NOTE: Reports are NOT copied because they contain cross-sheet references
-      // that would still point to the template sheet, not the new project's sheet.
-      // Reports must be set up manually in each WBS folder.
-      console.log(`ℹ️ Skipping ${templateFolder.reports?.length || 0} reports (require manual setup due to source sheet references)`)
+      // Copy reports - need to figure out the correct API approach
+      for (const templateReport of (templateFolder.reports || [])) {
+        try {
+          console.log(`Copying report: ${templateReport.name} (ID: ${templateReport.id})`)
+          console.log(`Report data:`, JSON.stringify(templateReport, null, 2))
+          
+          // Try to get the report first to verify the ID is valid
+          const reportDetails = await SmartsheetAPI.getReport(templateReport.id)
+          console.log(`Report details fetched successfully:`, reportDetails.name)
+          
+          // Now try to copy it
+          await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+          console.log(`✅ Copied report: ${templateReport.name}`)
+        } catch (err: any) {
+          console.error(`❌ Failed to copy report "${templateReport.name}":`, err.message)
+          console.error(`Full error:`, err)
+        }
+      }
 
       // Copy dashboards (optional - don't fail if dashboards can't be copied)
       for (const templateDashboard of (templateFolder.sights || [])) {

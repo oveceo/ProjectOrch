@@ -226,6 +226,15 @@ export class SmartsheetAPI {
     )
   }
 
+  // Get report details
+  static async getReport(reportId: number): Promise<any> {
+    return withRetry(
+      () => directApiCall('GET', `/reports/${reportId}`),
+      'getReport',
+      { reportId }
+    )
+  }
+
   // Create folder using direct API call (SDK doesn't support this well)
   static async createFolder(name: string, parentFolderId?: number): Promise<any> {
     if (!parentFolderId) {
