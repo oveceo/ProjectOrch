@@ -202,16 +202,12 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     }
   }
 
-  // Copy reports (optional - don't fail if reports can't be copied)
-  for (const templateReport of (templateFolder.reports || [])) {
-    try {
-      apiLogger.info('Copying report', { reportName: templateReport.name, reportId: templateReport.id })
-      await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
-      apiLogger.info('✅ Copied report', { reportName: templateReport.name })
-    } catch (err) {
-      apiLogger.warn('⚠️ Could not copy report - may need manual setup', { reportName: templateReport.name })
-    }
-  }
+  // NOTE: Reports are NOT copied because they contain cross-sheet references
+  // that would still point to the template sheet, not the new project's sheet.
+  // Reports must be set up manually in each WBS folder.
+  apiLogger.info('Skipping reports (require manual setup due to source sheet references)', { 
+    reportCount: templateFolder.reports?.length || 0 
+  })
 
   // Copy dashboards (optional - don't fail if dashboards can't be copied)
   for (const templateDashboard of (templateFolder.sights || [])) {
