@@ -267,9 +267,12 @@ export class SmartsheetAPI {
   }
 
   // Copy folder using direct API call
+  // Include ALL data: attachments, cellLinks, data, discussions, filters, forms, rules, ruleRecipients, shares
   static async copyFolder(sourceFolderId: number, destinationFolderId: number, newName: string): Promise<any> {
+    const includeParams = 'attachments,cellLinks,data,discussions,filters,forms,rules,ruleRecipients,shares'
+    
     return withRetry(
-      () => directApiCall('POST', `/folders/${sourceFolderId}/copy`, {
+      () => directApiCall('POST', `/folders/${sourceFolderId}/copy?include=${includeParams}`, {
         destinationType: 'folder',
         destinationId: destinationFolderId,
         newName: newName
