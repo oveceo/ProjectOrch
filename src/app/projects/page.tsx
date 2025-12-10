@@ -17,6 +17,7 @@ import { AlertTriangle, Calendar, Clock, Search, Filter, FolderOpen, CheckCircle
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ProjectWithRelations, ApiResponse } from '@/types'
 import { ProjectStatus, ApprovalStatus } from '@prisma/client'
+import { SyncPanel } from '@/components/SyncPanel'
 
 // Shape of project update payload (matches /api/projects/[id] schema)
 interface CreateProjectForm {
@@ -340,6 +341,9 @@ function ProjectsContent() {
             </div>
           </div>
         </div>
+
+        {/* Sync Panel - Prominent placement for easy access */}
+        <SyncPanel onSyncComplete={fetchProjects} />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
