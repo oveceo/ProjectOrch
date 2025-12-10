@@ -16,6 +16,7 @@ import {
   ChevronRight, Filter
 } from 'lucide-react'
 import Link from 'next/link'
+import { SyncPanel } from '@/components/SyncPanel'
 
 interface Project {
   id: string
@@ -190,15 +191,10 @@ function MainContent() {
             <h1 className="text-3xl font-bold text-gray-900">Project Breakdown Management</h1>
             <p className="text-gray-600 mt-1">Manage your projects and tasks</p>
           </div>
-          <Button 
-            onClick={syncFromSmartsheet} 
-            disabled={syncing}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {syncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Sync from Smartsheet
-          </Button>
         </div>
+
+        {/* Sync Panel - Create WBS folders & Sync data */}
+        <SyncPanel onSyncComplete={loadData} />
 
         {/* Message */}
         {message && (
