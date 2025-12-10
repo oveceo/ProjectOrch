@@ -89,8 +89,8 @@ export class PortfolioSyncService {
       // Log the project creation/update with the P number as title
       console.log(`Project ${projectData.projectCode} processed - Title set to: ${project.title}`)
 
-      // Check if WBS is needed and create if necessary
-      if (projectData.requiresWbs && !project.wbsSheetId) {
+      // ONLY TRIGGER: Approval Status = "Approved" AND no WBS exists yet
+      if (projectData.approvalStatus === ApprovalStatus.Approved && !project.wbsSheetId) {
         await this.createWbsForProject(project)
       }
 
@@ -217,12 +217,13 @@ export class PortfolioSyncService {
 
       // Step 2: Get template folder contents
       const templateFolder = await SmartsheetAPI.getFolder(WBS_TEMPLATE_FOLDER_ID)
-      console.log(`Template folder has ${templateFolder.sheets?.length || 0} sheets`)
+      console.log(`Template folder has ${templateFolder.sheets?.length || 0} sheets, ${templateFolder.reports?.length || 0} reports, ${templateFolder.sights?.length || 0} dashboards`)
 
-      // Step 3: Copy each sheet from template to new folder
+      // Step 3: Copy ALL items from template to new folder (sheets, reports, dashboards)
       let wbsSheetId: number | null = null
       let wbsSheetPermalink: string | null = null
       
+      // Copy sheets
       for (const templateSheet of (templateFolder.sheets || [])) {
         console.log(`Copying sheet: ${templateSheet.name}`)
         
@@ -239,6 +240,18 @@ export class PortfolioSyncService {
           wbsSheetPermalink = copyResult.result.permalink
           console.log(`Found and copied WBS sheet: ${wbsSheetId}`)
         }
+      }
+
+      // Copy reports
+      for (const templateReport of (templateFolder.reports || [])) {
+        console.log(`Copying report: ${templateReport.name}`)
+        await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+      }
+
+      // Copy dashboards (called "sights" in API)
+      for (const templateDashboard of (templateFolder.sights || [])) {
+        console.log(`Copying dashboard: ${templateDashboard.name}`)
+        await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
       }
 
       if (!wbsSheetId) {
