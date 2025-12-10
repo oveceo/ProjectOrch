@@ -242,16 +242,26 @@ export class PortfolioSyncService {
         }
       }
 
-      // Copy reports
+      // Copy reports (optional - don't fail if reports can't be copied)
       for (const templateReport of (templateFolder.reports || [])) {
-        console.log(`Copying report: ${templateReport.name}`)
-        await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+        try {
+          console.log(`Copying report: ${templateReport.name}`)
+          await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+          console.log(`✅ Copied report: ${templateReport.name}`)
+        } catch (err) {
+          console.warn(`⚠️ Could not copy report "${templateReport.name}" - reports may need manual setup`)
+        }
       }
 
-      // Copy dashboards (called "sights" in API)
+      // Copy dashboards (optional - don't fail if dashboards can't be copied)
       for (const templateDashboard of (templateFolder.sights || [])) {
-        console.log(`Copying dashboard: ${templateDashboard.name}`)
-        await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
+        try {
+          console.log(`Copying dashboard: ${templateDashboard.name}`)
+          await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
+          console.log(`✅ Copied dashboard: ${templateDashboard.name}`)
+        } catch (err) {
+          console.warn(`⚠️ Could not copy dashboard "${templateDashboard.name}" - dashboards may need manual setup`)
+        }
       }
 
       if (!wbsSheetId) {

@@ -202,16 +202,26 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     }
   }
 
-  // Copy reports
+  // Copy reports (optional - don't fail if reports can't be copied)
   for (const templateReport of (templateFolder.reports || [])) {
-    apiLogger.info('Copying report', { reportName: templateReport.name, reportId: templateReport.id })
-    await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+    try {
+      apiLogger.info('Copying report', { reportName: templateReport.name, reportId: templateReport.id })
+      await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+      apiLogger.info('✅ Copied report', { reportName: templateReport.name })
+    } catch (err) {
+      apiLogger.warn('⚠️ Could not copy report - may need manual setup', { reportName: templateReport.name })
+    }
   }
 
-  // Copy dashboards (called "sights" in API)
+  // Copy dashboards (optional - don't fail if dashboards can't be copied)
   for (const templateDashboard of (templateFolder.sights || [])) {
-    apiLogger.info('Copying dashboard', { dashboardName: templateDashboard.name, dashboardId: templateDashboard.id })
-    await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
+    try {
+      apiLogger.info('Copying dashboard', { dashboardName: templateDashboard.name, dashboardId: templateDashboard.id })
+      await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
+      apiLogger.info('✅ Copied dashboard', { dashboardName: templateDashboard.name })
+    } catch (err) {
+      apiLogger.warn('⚠️ Could not copy dashboard - may need manual setup', { dashboardName: templateDashboard.name })
+    }
   }
 
   if (!wbsSheetId) {
