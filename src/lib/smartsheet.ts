@@ -255,7 +255,7 @@ export class SmartsheetAPI {
   // Get folder contents using direct API call
   static async getFolder(folderId: number): Promise<any> {
     return withRetry(
-      () => directApiCall('GET', `/folders/${folderId}?include=sheets,folders,reports,dashboards`),
+      () => directApiCall('GET', `/folders/${folderId}?include=sheets,folders,reports,sights`),
       'getFolder',
       { folderId }
     )
