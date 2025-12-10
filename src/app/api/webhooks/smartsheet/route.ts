@@ -218,20 +218,39 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     }
   }
 
-  // Copy reports - attempt with detailed logging
-  console.log('📊 REPORTS IN TEMPLATE:', JSON.stringify(templateFolder.reports, null, 2))
+  // Try to recreate reports with the new sheet as source
+  // Smartsheet API doesn't have a copy endpoint for reports, so we need to create new ones
+  const templateSheetId = templateFolder.sheets?.[0]?.id // Original template sheet ID
+  
   for (const templateReport of (templateFolder.reports || [])) {
     try {
-      console.log(`📊 Attempting to copy report: ${templateReport.name} (ID: ${templateReport.id})`)
-      apiLogger.info('Copying report', { reportName: templateReport.name, reportId: templateReport.id })
+      console.log(`📊 Attempting to recreate report: ${templateReport.name}`)
+      apiLogger.info('Getting full report definition', { reportName: templateReport.name, reportId: templateReport.id })
       
-      await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+      // Get the full report definition including source sheets
+      const fullReport = await SmartsheetAPI.getReportFull(templateReport.id)
+      console.log('📊 Full report definition:', JSON.stringify(fullReport, null, 2))
       
-      console.log(`📊 ✅ Successfully copied report: ${templateReport.name}`)
-      apiLogger.info('✅ Copied report', { reportName: templateReport.name })
+      // Try to create a new report that references the new sheet instead of template
+      // This might not work as Smartsheet's report creation API is limited
+      const newReportDef = {
+        name: templateReport.name,
+        sourceSheets: [{ sheetId: wbsSheetId }] // Point to the new sheet
+      }
+      
+      console.log('📊 Attempting to create report with def:', JSON.stringify(newReportDef, null, 2))
+      const newReport = await SmartsheetAPI.createReport(projectFolderId, newReportDef)
+      
+      console.log(`📊 ✅ Successfully created report: ${templateReport.name}`)
+      apiLogger.info('✅ Created report', { reportName: templateReport.name, newReportId: newReport?.result?.id })
     } catch (err: any) {
-      console.log(`📊 ❌ Failed to copy report "${templateReport.name}": ${err.message}`)
-      apiLogger.warn('⚠️ Could not copy report', { reportName: templateReport.name, error: err.message })
+      console.log(`📊 ❌ Failed to create report "${templateReport.name}": ${err.message}`)
+      console.log('📊 Full error:', err)
+      apiLogger.warn('⚠️ Could not create report - manual setup required', { 
+        reportName: templateReport.name, 
+        error: err.message,
+        hint: 'Use Smartsheet UI to create report manually'
+      })
     }
   }
 

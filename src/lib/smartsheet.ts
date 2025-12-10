@@ -226,12 +226,30 @@ export class SmartsheetAPI {
     )
   }
 
-  // Get report details
+  // Get report details (basic)
   static async getReport(reportId: number): Promise<any> {
     return withRetry(
       () => directApiCall('GET', `/reports/${reportId}`),
       'getReport',
       { reportId }
+    )
+  }
+
+  // Get full report definition with source info
+  static async getReportFull(reportId: number): Promise<any> {
+    return withRetry(
+      () => directApiCall('GET', `/reports/${reportId}?include=sourceSheets`),
+      'getReportFull',
+      { reportId }
+    )
+  }
+
+  // Create a new report in a folder
+  static async createReport(folderId: number, reportDefinition: any): Promise<any> {
+    return withRetry(
+      () => directApiCall('POST', `/folders/${folderId}/reports`, reportDefinition),
+      'createReport',
+      { folderId }
     )
   }
 
