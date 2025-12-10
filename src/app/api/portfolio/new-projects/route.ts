@@ -109,9 +109,11 @@ export async function POST(request: NextRequest) {
 
       // If project doesn't exist, create it
       if (!project) {
-        const projectName = projectNameCol 
+        const rawProjectName = projectNameCol 
           ? SmartsheetAPI.getCellValue(row, sheet.columns, 'Project Name') || projectCode
           : projectCode
+        // Ensure project name is always a string
+        const projectName = String(rawProjectName)
 
         apiLogger.info('Creating new project in database', { projectCode, projectName })
         
