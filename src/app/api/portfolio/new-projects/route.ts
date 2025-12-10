@@ -130,9 +130,21 @@ export async function POST(request: NextRequest) {
 
       // Check if project already has WBS folder in database
       if (project.wbsSheetId) {
-        apiLogger.info('Project already has WBS in database', { projectCode })
-        results.skipped++
-        continue
+        // Verify the sheet still exists in Smartsheet (user may have deleted it)
+        try {
+          await SmartsheetAPI.getSheet(parseInt(project.wbsSheetId))
+          apiLogger.info('Project already has WBS in database (verified exists)', { projectCode })
+          results.skipped++
+          continue
+        } catch (err) {
+          // Sheet no longer exists - clear the database and recreate
+          apiLogger.warn('WBS sheet no longer exists in Smartsheet, clearing database', { projectCode, oldSheetId: project.wbsSheetId })
+          await prisma.project.update({
+            where: { id: project.id },
+            data: { wbsSheetId: null, wbsSheetUrl: null, wbsAppUrl: null, wbsFolderId: null }
+          })
+          // Continue to create new WBS
+        }
       }
 
       // Check if WBS folder already exists in Smartsheet (prevent duplicates)
