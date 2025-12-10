@@ -179,10 +179,11 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     dashboards: templateFolder.sights?.length || 0
   })
 
-  // Step 3: Copy each sheet from template to new folder
+  // Step 3: Copy ALL items from template to new folder (sheets, reports, dashboards)
   let wbsSheetId: number | null = null
   let wbsSheetPermalink: string | null = null
   
+  // Copy sheets
   for (const templateSheet of (templateFolder.sheets || [])) {
     apiLogger.info('Copying sheet', { sheetName: templateSheet.name, sheetId: templateSheet.id })
     
@@ -199,6 +200,18 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
       wbsSheetPermalink = copyResult.result.permalink
       apiLogger.info('Found and copied WBS sheet', { newSheetId: wbsSheetId })
     }
+  }
+
+  // Copy reports
+  for (const templateReport of (templateFolder.reports || [])) {
+    apiLogger.info('Copying report', { reportName: templateReport.name, reportId: templateReport.id })
+    await SmartsheetAPI.copyReport(templateReport.id, templateReport.name, projectFolderId)
+  }
+
+  // Copy dashboards (called "sights" in API)
+  for (const templateDashboard of (templateFolder.sights || [])) {
+    apiLogger.info('Copying dashboard', { dashboardName: templateDashboard.name, dashboardId: templateDashboard.id })
+    await SmartsheetAPI.copyDashboard(templateDashboard.id, templateDashboard.name, projectFolderId)
   }
 
   if (!wbsSheetId) {

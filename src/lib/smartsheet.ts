@@ -179,24 +179,50 @@ export class SmartsheetAPI {
     )
   }
 
-  // Copy sheet (template cloning)
+  // Copy sheet (template cloning) - uses direct API to include data, forms, rules
   static async copySheet(sheetId: number, name: string, folderId?: number): Promise<any> {
-    const options: any = {
-      sheetId,
-      body: {
-        newName: name
-      }
+    const body: any = {
+      newName: name
     }
 
     if (folderId) {
-      options.body.destinationType = 'folder'
-      options.body.destinationId = folderId
+      body.destinationType = 'folder'
+      body.destinationId = folderId
     }
 
+    // Include ALL content when copying: data (rows), attachments, forms, rules, etc.
+    const includeParams = 'data,attachments,cellLinks,forms,rules,ruleRecipients'
+    
     return withRetry(
-      () => client.sheets.copySheet(options),
+      () => directApiCall('POST', `/sheets/${sheetId}/copy?include=${includeParams}`, body),
       'copySheet',
       { sheetId, name, folderId }
+    )
+  }
+
+  // Copy report to a folder
+  static async copyReport(reportId: number, name: string, folderId: number): Promise<any> {
+    return withRetry(
+      () => directApiCall('POST', `/reports/${reportId}/copy`, {
+        newName: name,
+        destinationType: 'folder',
+        destinationId: folderId
+      }),
+      'copyReport',
+      { reportId, name, folderId }
+    )
+  }
+
+  // Copy dashboard (sight) to a folder
+  static async copyDashboard(dashboardId: number, name: string, folderId: number): Promise<any> {
+    return withRetry(
+      () => directApiCall('POST', `/sights/${dashboardId}/copy`, {
+        newName: name,
+        destinationType: 'folder',
+        destinationId: folderId
+      }),
+      'copyDashboard',
+      { dashboardId, name, folderId }
     )
   }
 
