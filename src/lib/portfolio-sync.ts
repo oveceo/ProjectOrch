@@ -102,17 +102,26 @@ export class PortfolioSyncService {
   }
 
   /**
+   * Safely convert any value to string or null
+   */
+  private static toStringOrNull(value: any): string | null {
+    if (value === null || value === undefined) return null
+    return String(value)
+  }
+
+  /**
    * Extract project data from Smartsheet row
+   * All string fields are explicitly converted to ensure type safety
    */
   private static extractProjectData(row: any, columns: any[]): any {
-    const projectCode = SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.PROJECT_CODE)
+    const projectCode = this.toStringOrNull(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.PROJECT_CODE))
     return {
       projectCode: projectCode,
       title: projectCode, // Use project code as title for WBS management
-      description: SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.PROJECT_NAME), // Move project name to description
-      category: SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.CATEGORY),
-      approverEmail: SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.APPROVED_BY),
-      assigneeEmail: SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.ASSIGNED_TO),
+      description: this.toStringOrNull(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.PROJECT_NAME)),
+      category: this.toStringOrNull(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.CATEGORY)),
+      approverEmail: this.toStringOrNull(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.APPROVED_BY)),
+      assigneeEmail: this.toStringOrNull(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.ASSIGNED_TO)),
       approvalStatus: this.mapApprovalStatus(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.APPROVAL_STATUS)),
       status: this.mapProjectStatus(SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.STATUS)),
       requiresWbs: SmartsheetAPI.getCellValue(row, columns, PORTFOLIO_COLUMNS.WORK_BREAKDOWN_NEEDED) === true,
