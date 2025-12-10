@@ -196,50 +196,64 @@ export class PortfolioSyncService {
 
   /**
    * Create WBS sheet for project with proper folder structure
+   * 
+   * Steps:
+   * 1. Create new empty folder named "WBS (#P-XXXX)"
+   * 2. Get template folder contents
+   * 3. Copy each sheet from template to new folder
+   * 4. Update row 1 Name cell with project code in the WBS sheet
    */
   private static async createWbsForProject(project: any): Promise<void> {
     try {
       console.log(`Creating WBS structure for project ${project.projectCode}`)
 
-      // Step 1: Copy the entire template folder (includes WBS sheet, dashboards, reports)
+      // Step 1: Create new empty folder
       const folderName = `WBS (#${project.projectCode})`
-      console.log(`Copying template folder ${WBS_TEMPLATE_FOLDER_ID} to create: ${folderName}`)
+      console.log(`Creating folder: ${folderName}`)
       
-      const copyResponse = await SmartsheetAPI.copyFolder(
-        WBS_TEMPLATE_FOLDER_ID,
-        WBS_PARENT_FOLDER_ID,
-        folderName
-      )
-      
-      const projectFolderId = copyResponse.result.id
+      const createFolderResponse = await SmartsheetAPI.createFolder(folderName, WBS_PARENT_FOLDER_ID)
+      const projectFolderId = createFolderResponse.result.id
       console.log(`✅ Created folder: ${folderName} (ID: ${projectFolderId})`)
 
-      // Step 2: Get the copied folder contents to find the WBS sheet
-      const folderContents = await SmartsheetAPI.getFolder(projectFolderId)
-      console.log(`Folder contents: ${folderContents.sheets?.length || 0} sheets`)
-      
-      // Find the "Work Breakdown Schedule" sheet in the copied folder
-      const wbsSheet = folderContents.sheets?.find((sheet: any) => 
-        sheet.name === 'Work Breakdown Schedule' || 
-        sheet.name.toLowerCase().includes('work breakdown')
-      )
+      // Step 2: Get template folder contents
+      const templateFolder = await SmartsheetAPI.getFolder(WBS_TEMPLATE_FOLDER_ID)
+      console.log(`Template folder has ${templateFolder.sheets?.length || 0} sheets`)
 
-      if (!wbsSheet) {
-        console.error('Could not find Work Breakdown Schedule sheet in copied folder')
-        throw new Error('WBS sheet not found in copied folder')
+      // Step 3: Copy each sheet from template to new folder
+      let wbsSheetId: number | null = null
+      let wbsSheetPermalink: string | null = null
+      
+      for (const templateSheet of (templateFolder.sheets || [])) {
+        console.log(`Copying sheet: ${templateSheet.name}`)
+        
+        const copyResult = await SmartsheetAPI.copySheet(
+          templateSheet.id,
+          templateSheet.name, // Keep same name
+          projectFolderId
+        )
+        
+        // Track the WBS sheet for updating
+        if (templateSheet.name === 'Work Breakdown Schedule' || 
+            templateSheet.name.toLowerCase().includes('work breakdown')) {
+          wbsSheetId = copyResult.result.id
+          wbsSheetPermalink = copyResult.result.permalink
+          console.log(`Found and copied WBS sheet: ${wbsSheetId}`)
+        }
       }
 
-      console.log(`Found WBS sheet: ${wbsSheet.name} (ID: ${wbsSheet.id})`)
+      if (!wbsSheetId) {
+        throw new Error('WBS sheet not found in template folder')
+      }
 
-      // Step 3: Update the first row's Name cell with project code
-      const sheet = await SmartsheetAPI.getSheet(wbsSheet.id)
+      // Step 4: Update the first row's Name cell with project code
+      const sheet = await SmartsheetAPI.getSheet(wbsSheetId)
       const firstRow = sheet.rows[0]
 
       if (firstRow) {
         const nameColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Name')
 
         if (nameColumn) {
-          await SmartsheetAPI.updateRows(wbsSheet.id, [{
+          await SmartsheetAPI.updateRows(wbsSheetId, [{
             id: firstRow.id,
             cells: [
               SmartsheetAPI.createCell(nameColumn.id, project.projectCode)
@@ -249,16 +263,16 @@ export class PortfolioSyncService {
         }
       }
 
-      // Step 4: Create hyperlinks in Portfolio sheet
-      await this.updatePortfolioLinks(project, wbsSheet.id, wbsSheet.permalink)
+      // Step 5: Create hyperlinks in Portfolio sheet
+      await this.updatePortfolioLinks(project, wbsSheetId, wbsSheetPermalink || '')
 
-      // Step 5: Update project record with folder and sheet info
+      // Step 6: Update project record with folder and sheet info
       await prisma.project.update({
         where: { id: project.id },
         data: {
           wbsFolderId: projectFolderId.toString(),
-          wbsSheetId: wbsSheet.id.toString(),
-          wbsSheetUrl: wbsSheet.permalink,
+          wbsSheetId: wbsSheetId.toString(),
+          wbsSheetUrl: wbsSheetPermalink,
           wbsAppUrl: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
         }
       })

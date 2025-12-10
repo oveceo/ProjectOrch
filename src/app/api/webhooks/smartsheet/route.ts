@@ -149,47 +149,68 @@ async function processNewRow(rowId: number, sheetId: number) {
 
 /**
  * Create WBS folder structure for a project
+ * 
+ * Steps:
+ * 1. Create new empty folder named "WBS (#P-XXXX)"
+ * 2. Get template folder contents
+ * 3. Copy each sheet from template to new folder
+ * 4. Update row 1 Name cell with project code in the WBS sheet
  */
 async function createWbsForProject(project: any, rowId: number, sheet: any) {
   const folderName = `WBS (#${project.projectCode})`
   
-  apiLogger.info('Copying template folder', { 
-    templateId: WBS_TEMPLATE_FOLDER_ID, 
-    newName: folderName 
+  apiLogger.info('Creating WBS folder structure', { 
+    projectCode: project.projectCode,
+    folderName 
   })
 
-  // Step 1: Copy the template folder
-  const copyResponse = await SmartsheetAPI.copyFolder(
-    WBS_TEMPLATE_FOLDER_ID,
-    WBS_PARENT_FOLDER_ID,
-    folderName
-  )
-  
-  const projectFolderId = copyResponse.result.id
-  apiLogger.info('Folder created', { folderName, folderId: projectFolderId })
+  // Step 1: Create new empty folder
+  const createFolderResponse = await SmartsheetAPI.createFolder(folderName, WBS_PARENT_FOLDER_ID)
+  const projectFolderId = createFolderResponse.result.id
+  apiLogger.info('Created empty folder', { folderName, folderId: projectFolderId })
 
-  // Step 2: Get folder contents to find WBS sheet
-  const folderContents = await SmartsheetAPI.getFolder(projectFolderId)
-  
-  const wbsSheet = folderContents.sheets?.find((s: any) => 
-    s.name === 'Work Breakdown Schedule' || 
-    s.name.toLowerCase().includes('work breakdown')
-  )
+  // Step 2: Get template folder contents
+  const templateFolder = await SmartsheetAPI.getFolder(WBS_TEMPLATE_FOLDER_ID)
+  apiLogger.info('Template folder contents', { 
+    sheets: templateFolder.sheets?.length || 0,
+    reports: templateFolder.reports?.length || 0,
+    dashboards: templateFolder.sights?.length || 0
+  })
 
-  if (!wbsSheet) {
-    throw new Error('WBS sheet not found in copied folder')
+  // Step 3: Copy each sheet from template to new folder
+  let wbsSheetId: number | null = null
+  let wbsSheetPermalink: string | null = null
+  
+  for (const templateSheet of (templateFolder.sheets || [])) {
+    apiLogger.info('Copying sheet', { sheetName: templateSheet.name, sheetId: templateSheet.id })
+    
+    const copyResult = await SmartsheetAPI.copySheet(
+      templateSheet.id,
+      templateSheet.name, // Keep same name
+      projectFolderId
+    )
+    
+    // Track the WBS sheet for updating
+    if (templateSheet.name === 'Work Breakdown Schedule' || 
+        templateSheet.name.toLowerCase().includes('work breakdown')) {
+      wbsSheetId = copyResult.result.id
+      wbsSheetPermalink = copyResult.result.permalink
+      apiLogger.info('Found and copied WBS sheet', { newSheetId: wbsSheetId })
+    }
   }
 
-  apiLogger.info('Found WBS sheet', { sheetId: wbsSheet.id, sheetName: wbsSheet.name })
+  if (!wbsSheetId) {
+    throw new Error('WBS sheet not found in template folder')
+  }
 
-  // Step 3: Update row 1 Name cell with project code
-  const wbsSheetData = await SmartsheetAPI.getSheet(wbsSheet.id)
+  // Step 4: Update row 1 Name cell with project code
+  const wbsSheetData = await SmartsheetAPI.getSheet(wbsSheetId)
   const firstRow = wbsSheetData.rows[0]
 
   if (firstRow) {
     const nameColumn = SmartsheetAPI.findColumnByTitle(wbsSheetData.columns, 'Name')
     if (nameColumn) {
-      await SmartsheetAPI.updateRows(wbsSheet.id, [{
+      await SmartsheetAPI.updateRows(wbsSheetId, [{
         id: firstRow.id,
         cells: [{ columnId: nameColumn.id, value: project.projectCode }]
       }])
@@ -197,16 +218,16 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     }
   }
 
-  // Step 4: Update portfolio row with links
+  // Step 5: Update portfolio row with links
   const projectPlanColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'Project Plan')
   const wbsAppLinkColumn = SmartsheetAPI.findColumnByTitle(sheet.columns, 'WBS App Link')
 
   const cells = []
-  if (projectPlanColumn) {
+  if (projectPlanColumn && wbsSheetPermalink) {
     cells.push({
       columnId: projectPlanColumn.id,
       value: 'Work Breakdown Schedule',
-      hyperlink: { url: wbsSheet.permalink }
+      hyperlink: { url: wbsSheetPermalink }
     })
   }
   if (wbsAppLinkColumn) {
@@ -221,13 +242,13 @@ async function createWbsForProject(project: any, rowId: number, sheet: any) {
     apiLogger.info('Updated portfolio row with WBS links')
   }
 
-  // Step 5: Update database
+  // Step 6: Update database
   await prisma.project.update({
     where: { id: project.id },
     data: {
       wbsFolderId: projectFolderId.toString(),
-      wbsSheetId: wbsSheet.id.toString(),
-      wbsSheetUrl: wbsSheet.permalink,
+      wbsSheetId: wbsSheetId.toString(),
+      wbsSheetUrl: wbsSheetPermalink,
       wbsAppUrl: `${process.env.APP_BASE_URL}/projects/${project.id}/wbs`
     }
   })
