@@ -7,6 +7,28 @@ const client = smartsheet.createClient({
   logLevel: 'info'
 })
 
+// Direct API base URL for operations not supported by SDK
+const SMARTSHEET_API_BASE = 'https://api.smartsheet.com/2.0'
+
+// Helper for direct API calls (for operations SDK doesn't support well)
+async function directApiCall(method: string, endpoint: string, body?: any): Promise<any> {
+  const response = await fetch(`${SMARTSHEET_API_BASE}${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${process.env.SMARTSHEET_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Smartsheet API error: ${response.status} - ${errorData.message || response.statusText}`)
+  }
+  
+  return response.json()
+}
+
 // Rate limiting and retry configuration
 const RETRY_CONFIG = {
   maxRetries: 3,
@@ -178,48 +200,36 @@ export class SmartsheetAPI {
     )
   }
 
-  // Create folder
-  static async createFolder(name: string, parentId?: number): Promise<any> {
-    const options: any = {
-      body: {
-        name
-      }
+  // Create folder using direct API call (SDK doesn't support this well)
+  static async createFolder(name: string, parentFolderId?: number): Promise<any> {
+    if (!parentFolderId) {
+      throw new Error('parentFolderId is required for creating folders')
     }
-
-    if (parentId) {
-      options.folderId = parentId
-    }
-
+    
     return withRetry(
-      () => client.folders.createFolder(options),
+      () => directApiCall('POST', `/folders/${parentFolderId}/folders`, { name }),
       'createFolder',
-      { name, parentId }
+      { name, parentFolderId }
     )
   }
 
-  // Copy folder (copies entire folder with all sheets/dashboards/reports inside)
+  // Copy folder using direct API call
   static async copyFolder(sourceFolderId: number, destinationFolderId: number, newName: string): Promise<any> {
     return withRetry(
-      () => client.folders.copyFolder({
-        folderId: sourceFolderId,
-        body: {
-          destinationType: 'folder',
-          destinationId: destinationFolderId,
-          newName: newName
-        }
+      () => directApiCall('POST', `/folders/${sourceFolderId}/copy`, {
+        destinationType: 'folder',
+        destinationId: destinationFolderId,
+        newName: newName
       }),
       'copyFolder',
       { sourceFolderId, destinationFolderId, newName }
     )
   }
 
-  // Get folder contents
+  // Get folder contents using direct API call
   static async getFolder(folderId: number): Promise<any> {
     return withRetry(
-      () => client.folders.getFolder({
-        id: folderId,
-        include: 'sheets,folders'
-      }),
+      () => directApiCall('GET', `/folders/${folderId}?include=sheets,folders,reports,dashboards`),
       'getFolder',
       { folderId }
     )
