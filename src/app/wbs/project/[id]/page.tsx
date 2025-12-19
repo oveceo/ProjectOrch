@@ -238,11 +238,25 @@ function flattenTree(items: WbsItem[], parentId: string | null = null, parentSma
 // Flatten tree for display (with depth info preserved)
 function flattenForDisplay(items: WbsItem[]): WbsItem[] {
   const result: WbsItem[] = []
-  const traverse = (items: WbsItem[]) => {
+  const traverse = (items: WbsItem[], parentType: string = '') => {
+    let subtaskCounter = 0
     items.forEach(item => {
+      // Track subtask index for coloring
+      const wbs = item.wbsNumber || ''
+      const dotCount = (wbs.match(/\./g) || []).length
+      const itemType = item.skipWbs ? 'Header' : 
+                      dotCount === 0 ? 'Phase' : 
+                      dotCount === 1 ? 'Task' : 'Subtask'
+      
+      // Store subtask index on the item for rendering
+      if (itemType === 'Subtask') {
+        (item as any).subtaskIndex = subtaskCounter
+        subtaskCounter++
+      }
+      
       result.push(item)
       if (item.isExpanded && item.children.length > 0) {
-        traverse(item.children)
+        traverse(item.children, itemType)
       }
     })
   }
@@ -615,15 +629,26 @@ function WbsEditorContent() {
     const hasChildren = item.children.length > 0
     const statusConfig = STATUS_OPTIONS.find(s => s.value === item.status) || STATUS_OPTIONS[0]
     const itemType = getItemTypeLabel(item)
+    
+    // Determine row background color
+    let rowBgClass = ''
+    if (item.skipWbs) {
+      rowBgClass = 'bg-purple-50/50 font-semibold'
+    } else if (itemType === 'Phase') {
+      rowBgClass = 'bg-blue-50/30 font-semibold'
+    } else if (itemType === 'Task') {
+      rowBgClass = 'bg-gray-50/50'
+    } else if (itemType === 'Subtask') {
+      // Alternate opacity for consecutive subtasks
+      const subtaskIndex = (item as any).subtaskIndex || 0
+      const opacities = ['bg-slate-50/30', 'bg-slate-50/50', 'bg-slate-50/70', 'bg-slate-50/90']
+      rowBgClass = opacities[subtaskIndex % opacities.length]
+    }
 
     return (
       <tr 
         key={item.id || item.tempId}
-        className={`border-b border-gray-200 hover:bg-blue-50/50 ${
-          item.skipWbs ? 'bg-purple-50/50 font-semibold' :
-          itemType === 'Phase' ? 'bg-blue-50/30 font-semibold' : 
-          itemType === 'Task' ? 'bg-gray-50/50' : ''
-        }`}
+        className={`border-b border-gray-200 hover:bg-blue-50/50 ${rowBgClass}`}
       >
         {/* Skip WBS */}
         <td className="w-12 px-2 py-2 text-center">
