@@ -238,25 +238,11 @@ function flattenTree(items: WbsItem[], parentId: string | null = null, parentSma
 // Flatten tree for display (with depth info preserved)
 function flattenForDisplay(items: WbsItem[]): WbsItem[] {
   const result: WbsItem[] = []
-  const traverse = (items: WbsItem[], parentType: string = '') => {
-    let subtaskCounter = 0
+  const traverse = (items: WbsItem[]) => {
     items.forEach(item => {
-      // Track subtask index for coloring
-      const wbs = item.wbsNumber || ''
-      const dotCount = (wbs.match(/\./g) || []).length
-      const itemType = item.skipWbs ? 'Header' : 
-                      dotCount === 0 ? 'Phase' : 
-                      dotCount === 1 ? 'Task' : 'Subtask'
-      
-      // Store subtask index on the item for rendering
-      if (itemType === 'Subtask') {
-        (item as any).subtaskIndex = subtaskCounter
-        subtaskCounter++
-      }
-      
       result.push(item)
       if (item.isExpanded && item.children.length > 0) {
-        traverse(item.children, itemType)
+        traverse(item.children)
       }
     })
   }
@@ -624,7 +610,7 @@ function WbsEditorContent() {
   }
 
   // Render row
-  const renderRow = (item: WbsItem) => {
+  const renderRow = (item: WbsItem, subtaskIndex: number = 0) => {
     const indent = item.depth * 24
     const hasChildren = item.children.length > 0
     const statusConfig = STATUS_OPTIONS.find(s => s.value === item.status) || STATUS_OPTIONS[0]
@@ -633,15 +619,14 @@ function WbsEditorContent() {
     // Determine row background color
     let rowBgClass = ''
     if (item.skipWbs) {
-      rowBgClass = 'bg-purple-50/50 font-semibold'
+      rowBgClass = 'bg-purple-100/40 font-semibold'
     } else if (itemType === 'Phase') {
-      rowBgClass = 'bg-blue-50/30 font-semibold'
+      rowBgClass = 'bg-blue-100/45 font-semibold'
     } else if (itemType === 'Task') {
-      rowBgClass = 'bg-gray-50/50'
+      rowBgClass = 'bg-emerald-100/35'
     } else if (itemType === 'Subtask') {
       // Alternate opacity for consecutive subtasks
-      const subtaskIndex = (item as any).subtaskIndex || 0
-      const opacities = ['bg-slate-50/30', 'bg-slate-50/50', 'bg-slate-50/70', 'bg-slate-50/90']
+      const opacities = ['bg-slate-100/40', 'bg-slate-100/60', 'bg-slate-100/80', 'bg-slate-100']
       rowBgClass = opacities[subtaskIndex % opacities.length]
     }
 
@@ -923,7 +908,19 @@ function WbsEditorContent() {
               </thead>
               <tbody>
                 {displayItems.length > 0 ? (
-                  displayItems.map(item => renderRow(item))
+                  (() => {
+                    const subtaskCounters = new Map<string, number>()
+                    return displayItems.map(item => {
+                      const itemType = getItemTypeLabel(item)
+                      if (itemType !== 'Subtask') return renderRow(item)
+
+                      const parentKey = item.parentRowId || item.parentId || '__root__'
+                      const idx = subtaskCounters.get(parentKey) ?? 0
+                      subtaskCounters.set(parentKey, idx + 1)
+
+                      return renderRow(item, idx)
+                    })
+                  })()
                 ) : (
                   <tr>
                     <td colSpan={12} className="text-center py-16">

@@ -206,11 +206,13 @@ const APPROVAL_COLORS: Record<string, string> = {
 function ProgressItem({ 
   item, 
   level = 0, 
-  defaultExpanded = false 
+  defaultExpanded = false,
+  subtaskIndex = 0
 }: { 
   item: WbsItem
   level?: number
   defaultExpanded?: boolean
+  subtaskIndex?: number
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   const hasChildren = item.children.filter(c => !c.skipWbs).length > 0
@@ -224,6 +226,28 @@ function ProgressItem({
   }
   
   const itemType = getItemType()
+
+  // Row styling by type (matches WBS editor visual language)
+  const getRowStyle = () => {
+    // Expanded state (only meaningful when it has children)
+    if (expanded && hasChildren) {
+      if (itemType === 'phase') return { bg: 'bg-blue-100/60', border: 'border-blue-300', hover: 'hover:bg-blue-100/70' }
+      if (itemType === 'task') return { bg: 'bg-emerald-100/55', border: 'border-emerald-300', hover: 'hover:bg-emerald-100/70' }
+      return { bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:bg-blue-50' }
+    }
+
+    // Default state
+    if (itemType === 'phase') return { bg: 'bg-blue-100/45', border: 'border-blue-200', hover: 'hover:bg-blue-50' }
+    if (itemType === 'task') return { bg: 'bg-emerald-100/35', border: 'border-emerald-200', hover: 'hover:bg-emerald-50' }
+    if (itemType === 'subtask') {
+      const opacities = ['bg-slate-100/40', 'bg-slate-100/60', 'bg-slate-100/80', 'bg-slate-100']
+      return { bg: opacities[subtaskIndex % opacities.length], border: 'border-slate-200', hover: 'hover:bg-slate-100' }
+    }
+
+    return { bg: 'bg-white', border: 'border-gray-200', hover: hasChildren ? 'hover:bg-blue-50' : 'hover:bg-gray-50' }
+  }
+
+  const rowStyle = getRowStyle()
   
   // Get progress bar color based on progress
   const getProgressColor = (progress: number) => {
@@ -261,8 +285,8 @@ function ProgressItem({
       <div 
         className={`
           p-3 rounded-lg mb-2 transition-all cursor-pointer
-          ${hasChildren ? 'hover:bg-blue-50' : 'hover:bg-gray-50'}
-          ${expanded && hasChildren ? 'bg-blue-50 border border-blue-200' : 'bg-white border border-gray-200'}
+          ${rowStyle.hover}
+          ${rowStyle.bg} border ${rowStyle.border}
         `}
         onClick={() => hasChildren && setExpanded(!expanded)}
       >
@@ -339,8 +363,8 @@ function ProgressItem({
       {/* Children */}
       {expanded && hasChildren && (
         <div className="mt-1">
-          {item.children.filter(c => !c.skipWbs).map(child => (
-            <ProgressItem key={child.id} item={child} level={level + 1} />
+          {item.children.filter(c => !c.skipWbs).map((child, idx) => (
+            <ProgressItem key={child.id} item={child} level={level + 1} subtaskIndex={idx} />
           ))}
         </div>
       )}
