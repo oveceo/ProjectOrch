@@ -354,8 +354,8 @@ function ProgressItem({
           </div>
         </div>
         
-        {/* Description if available */}
-        {item.description && expanded && (
+        {/* Description if available - show for subtasks always, for phases/tasks when expanded */}
+        {item.description && (itemType === 'subtask' || expanded) && (
           <p className="mt-2 text-sm text-gray-500 ml-8">{item.description}</p>
         )}
       </div>
